@@ -1,0 +1,125 @@
+year,n_nests,large_chicks_per_nest,colony
+2011,520,0.14,sklinna
+2012,517,0,sklinna
+2013,548,0.07,sklinna
+2014,226,0.01,sklinna
+2015,240,0.05,sklinna
+2016,111,0.27,sklinna
+2017,96,0.34,sklinna
+2018,83,NA,sklinna
+2019,94,NA,sklinna
+2020,125,0.33,sklinna
+2021,122,0.57,sklinna
+2022,225,0.64,sklinna
+2023,320,1,sklinna
+2013,,0.52,isle of canna
+2014,,0.87,isle of canna
+2015,,0.93,isle of canna
+2016,,0.98,isle of canna
+2017,,0.76,isle of canna
+2018,,0.86,isle of canna
+2019,,0.45,isle of canna
+2020,,NA,isle of canna
+2021,,0.95,isle of canna
+2013,66,1.11,rockabill
+2014,155,1.06,rockabill
+2015,215,0.86,rockabill
+2016,208,0.31,rockabill
+2017,160,0.24,rockabill
+2018,133,0.64,rockabill
+2019,167,0.72,rockabill
+2020,173,0.54,rockabill
+2021,165,1.11,rockabill
+2018,45,0.56,kippaku
+2019,101,0.575,kippaku
+2020,67,0.88,kippaku
+2021,46,0.04,kippaku
+2009,615,0.323577236,røst
+2010,714,0.400560224,røst
+2011,633,0.072669826,røst
+2012,587,0.245315162,røst
+2013,702,0.207977208,røst
+2014,670,0.217910448,røst
+2015,733,0.309686221,røst
+2016,809,0.232385661,røst
+2017,826,0.527845036,røst
+2018,752,0.432180851,røst
+2019,753,0.584329349,røst
+2020,715,0.318881119,røst
+2021,695,0.358273381,røst
+2022,611,0.281505728,røst
+2006,503,0.72,bjørnøya
+2007,538,0.77,bjørnøya
+2008,503,0.72,bjørnøya
+2009,499,0.739,bjørnøya
+2010,512,0.699,bjørnøya
+2011,634,0.62,bjørnøya
+2012,389,0.699,bjørnøya
+2013,389,0.699,bjørnøya
+2014,747,0.49,bjørnøya
+2015,747,0.49,bjørnøya
+2016,747,0.49,bjørnøya
+2017,503,0.73,bjørnøya
+2018,458,0.74,bjørnøya
+2019,407,0.74,bjørnøya
+2020,223,0.821,bjørnøya
+2021,290,0.797,bjørnøya
+2022,229,0.803,bjørnøya
+2008,29,0.655,isfjorden
+2009,24,0.833,isfjorden
+2010,39,0.667,isfjorden
+2011,47,0.396,isfjorden
+2012,59,0.273,isfjorden
+2013,17,0,isfjorden
+2014,37,0,isfjorden
+2015,48,0.451,isfjorden
+2016,72,0.657,isfjorden
+2017,36,0.0556,isfjorden
+2018,40,0.195,isfjorden
+2019,22,0.409,isfjorden
+2021,32,0.29,isfjorden
+2019,22,0,kongsfjorden
+2021,33,0.875,kongsfjorden
+2022,29,0.259,kongsfjorden
+2013,351,0.407407407,isle of may
+2014,403,1.166253102,isle of may
+2015,569,1.068541301,isle of may
+2016,497,0.77665996,isle of may
+2017,670,0.943283582,isle of may
+2018,459,0.562091503,isle of may
+2019,721,0.915395284,isle of may
+2020,829,1.092882992,isle of may
+2021,911,1.339187706,isle of may
+1999,3084,0.596952,witless bay
+2000,1756,0.255695,witless bay
+2001,1234,0.534036,witless bay
+2002,1705,0.120821,witless bay
+2003,2135,0.439344,witless bay
+2004,1372,0.982507,witless bay
+2005,1388,0.996398,witless bay
+2006,1814,0.964168,witless bay
+2007,1424,0.32514,witless bay
+2008,945,0.798942,witless bay
+2009,2526,0.077197,witless bay
+2010,1593,0.329567,witless bay
+2011,1645,0.525228,witless bay
+2012,1194,0.742881,witless bay
+2013,2371,0.50232,witless bay
+2014,2365,0.826216,witless bay
+2015,1689,0.5672,witless bay
+2016,1651,0.333131,witless bay
+2018,1860,0.31129,witless bay
+2019,1101,0.517711,witless bay
+2020,779,0.376123,witless bay
+2021,2610,0.589655,witless bay
+2022,2521,0.712019,witless bay
+2023,1588,0.416877,witless bay
+2013,2486,0.17,faroe islands
+2014,2224,0.02,faroe islands
+2015,1961,0.06,faroe islands
+2016,2018,0.66,faroe islands
+2017,2230,1.24,faroe islands
+2018,119,0.4,faroe islands
+2019,94,0.31,faroe islands
+2020,104,0.18,faroe islands
+2021,136,0.41,faroe islands
