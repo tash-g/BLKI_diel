@@ -1138,8 +1138,6 @@ meta %<>% distinct(colony, .keep_all = TRUE) %>% dplyr::select(-ring)
 
 breeding <- merge(breeding, meta, by = "colony")
 
-save(breeding, file = "Data_inputs/BLKI_breeding.RData")
-
 
 ## Get mean number of nests per colony and year
 mean_nests <- breeding %>% group_by(colony) %>% summarise(mean_nests = mean(n_nests, na.rm = T))
