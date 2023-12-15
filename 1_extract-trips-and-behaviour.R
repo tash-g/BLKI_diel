@@ -48,7 +48,7 @@ thresh.immersion <- 15
 # Huge amount of data - so loop through previously subsetted files individually
 
 # Load metadata file
-load("Data_inputs_shared/BLKI_metadata.RData")
+load("Data_inputs/BLKI_metadata.RData")
 meta %<>% distinct(ring, .keep_all = TRUE) 
 
 # Identify relevant files 

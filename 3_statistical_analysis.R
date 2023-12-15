@@ -23,7 +23,7 @@
 packages <- c("zoo", "stringr", "ggplot2", "binom", "grid", "mgcv", "lomb", 
               "lubridate", "purrr", "dplyr","ggpubr", "magrittr", "lme4",
               "reshape2", "sjPlot", "glmmTMB", "DHARMa", "gamlss", "broom.mixed",
-              "ggeffects", "gamlss.tr")
+              "ggeffects")
 
 # Install packages not yet installed - change lib to library path
 # installed_packages <- packages %in% rownames(installed.packages())
@@ -40,12 +40,12 @@ source("BLKI_functions.R")
 # Create data_outputs folder if doesn't already exist
 out.path <- "./Data_outputs/"
 
-if(dir.exists(out.path) == FALSE) {
-  dir.create(out.path)
-}
+# if(dir.exists(out.path) == FALSE) {
+#   dir.create(out.path)
+# }
 
 
-## Load data -------------------------------------------------------------------
+# Load & process data ==========================================================
 load("Data_inputs/BLKI_attendance_2013-2022.RData")
 
 # Quick summary stats
@@ -59,36 +59,70 @@ kits.att_all %>%
 # 23     962     2013     2022
 
 
-# Visualise population-level behaviour (attendance/visits/immersion) ===========
-
-# Extract mean hourly attendance, mean visits, mean immersion
-
-att_by_colony <- kits.att_all %>% 
-  group_by(year, colony, col_lat, col_lon, datetime) %>%
-  summarise(hourly_att = mean(att_time/60),
-            hourly_vis = sum(num_visits)/n_distinct(ring),
-            hourly_imm = mean(total_imm)) %>%
-  mutate(hour = hour(datetime))
+### Extract mean hourly attendance, mean visits, mean immersion ----------------
+# att_by_colony <- kits.att_all %>% 
+#   group_by(year, colony, col_lat, col_lon, datetime) %>%
+#   summarise(hourly_att = mean(att_time/60),
+#             hourly_vis = sum(num_visits)/n_distinct(ring),
+#             hourly_imm = mean(total_imm)) %>%
+#   mutate(hour = hour(datetime))
 
 #save(att_by_colony, file = "Data_outputs/attendance_by_colony.Rdata")
 load("Data_outputs/attendance_by_colony.Rdata")
 
-# Summarise mean and CIs for each year, colony, hour
-summary_colony_att <- att_by_colony %>%
-  group_by(year, colony, col_lat, col_lon, hour) %>%
-  summarise(mean_att = mean(hourly_att),
-            lower_att = confint(lm(hourly_att~1))[1],
-            upper_att = confint(lm(hourly_att~1))[2],
-            mean_vis = mean(hourly_vis),
-            lower_vis = confint(lm(hourly_vis~1))[1],
-            upper_vis = confint(lm(hourly_vis~1))[2],
-            mean_imm = mean(hourly_imm),
-            lower_imm = confint(lm(hourly_imm~1))[1],
-            upper_imm = confint(lm(hourly_imm~1))[2])
+#### Summarise mean and CIs for each year, colony, hour -------------------------
+# summary_colony_att <- att_by_colony %>%
+#   group_by(year, colony, col_lat, col_lon, hour) %>%
+#   summarise(mean_att = mean(hourly_att),
+#             lower_att = confint(lm(hourly_att~1))[1],
+#             upper_att = confint(lm(hourly_att~1))[2],
+#             mean_vis = mean(hourly_vis),
+#             lower_vis = confint(lm(hourly_vis~1))[1],
+#             upper_vis = confint(lm(hourly_vis~1))[2],
+#             mean_imm = mean(hourly_imm),
+#             lower_imm = confint(lm(hourly_imm~1))[1],
+#             upper_imm = confint(lm(hourly_imm~1))[2])
 
 #save(summary_colony_att, file = "Data_outputs/summarised_colony_att.Rdata")
 load("Data_outputs/summarised_colony_att.Rdata")
 
+
+
+### Get immersion for all birds per time at each colony ------------------------
+# kits.pop.imm <- kits.att_all %>% 
+#   group_by(colony, col_lat, col_lon, datetime) %>%
+#   summarise(tot.imm = sum(total_imm),
+#             tot.kits = n_distinct(ring),
+#             prop.imm = tot.imm/tot.kits) %>%
+#   data.frame()
+
+#save(kits.pop.imm, file = "Data_outputs/BLKI_pop_imm.RData")
+load("Data_outputs/BLKI_pop_imm.RData")
+
+
+### Load behavioural data ------------------------------------------------------
+load("Data_inputs/BLKI_gls-daily-behaviour.RData")
+
+# Isolate summer months
+gls_daily %<>% mutate(month = as.numeric(lubridate::month(date))) %>% 
+  filter(month >= 6 & month <= 8) %>% dplyr::select(-month)
+
+# Get year
+gls_daily %<>% mutate(year = format(as.Date(date, format = "%Y-%m-%d"),"%Y"))
+
+
+
+### Colony attendance data -----------------------------------------------------
+
+# Prepare data
+gls_daily$col_mins <- gls_daily$col_att24*gls_daily$daylight.mins
+
+col_behav <- gls_daily %>%
+  dplyr::select(ring, date, col_att.day, n_recs.day, col_lat, year, col_mins) %>% 
+  filter(!is.na(n_recs.day))
+
+
+# Visualise population-level behaviour (attendance/visits/immersion) ===========
 
 ## ~ FIGURES ~ Plot attendance, visits, immersion for each year by colony ------------------------------
 
@@ -254,18 +288,6 @@ for (i in 1:length(colonies)) {
 
 # Find population-level ACF ====================================================
 
-# Get immersion for all birds per time at each colony
-kits.pop.imm <- kits.att_all %>% 
-  group_by(colony, col_lat, col_lon, datetime) %>%
-  summarise(tot.imm = sum(total_imm),
-            tot.kits = n_distinct(ring),
-            prop.imm = tot.imm/tot.kits) %>%
-  data.frame()
-
-#save(kits.pop.imm, file = "Data_outputs/BLKI_pop_imm.RData")
-load("Data_outputs/BLKI_pop_imm.RData")
-
-
 ## ~ FIGURE 2A ~ Plot colony prop immersion by latitude ------------------------
 colonies <- unique(kits.pop.imm$colony[order(kits.pop.imm$col_lat)])
 plot_list <- vector(mode = "list", length = length(colonies))
@@ -299,7 +321,6 @@ png("Figures/Figure 2A_imm_by_colony.png",
     width = 30, height = 24, units = "in", res = 300)
 gridExtra::grid.arrange(grobs = plot_list, nrow = 4)
 dev.off()
-
 
 
 ## Run autocorrelatIon function on each colony ---------------------------------
@@ -373,7 +394,6 @@ acf_col <- do.call("rbind", acf_data_list)
 load("Data_outputs/acf_colony_data.RData")
 
 
-
 ### ~ FIGURE 2B ~ ACF in immersion over all colonies ---------------------------
 png("Figures/Figure 2B_colony_imm_ACF.png", 
     width = 30, height = 24, units = "in", res = 300)
@@ -381,8 +401,7 @@ gridExtra::grid.arrange(grobs = plot_list, nrow = 4)
 dev.off()
 
 
-
-### ACF peak strength and lag with colony latitude -------------------------------------
+## ACF peak strength and lag with colony latitude ------------------------------
 
 peak_lag.lm <- lm(peak_lag ~ col_lat, data = acf_col)
 summary(peak_lag.lm)
@@ -393,7 +412,7 @@ peak_strength.lm <- lm(peak_strength ~ col_lat, data = acf_col)
 summary(peak_strength.lm)
 mean(acf_col$peak_strength)
 
-# ~ FIGURE 3 ~ Peak ACF by latitude -------------------------------------------
+### ~ FIGURE 3 ~ Peak ACF by latitude ------------------------------------------
 
 png("Figures/Figure 3_LM_peak_by_lat.png", 
     width = 7, height = 5, units = "in", res = 600)
@@ -405,7 +424,7 @@ ggplot(acf_col, aes(x = col_lat, y = peak_strength)) +
 dev.off()
 
 
-# Visualise indiviudal-level rhythms ===========================================
+# Visualise individual-level rhythms ===========================================
 
 # Find length of time series for each nest
 # (must divide by 2 cause need at least 2 observations for a TS)
@@ -532,7 +551,7 @@ summary(gam_model)
 
 
 
-# ~ FIGURE 4 ~ Immersion against sun elevation angle ---------------------------
+### ~ FIGURE 4 ~ Immersion against sun elevation angle -------------------------
 
 # Process data for plotting
 p_obj <- plot(gam_model, residuals = TRUE)
@@ -558,17 +577,7 @@ dev.off()
 
 # Assess effects on behaviour ==================================================
 
-load("Data_inputs/BLKI_gls-daily-behaviour.RData")
-
-# Isolate summer months
-gls_daily %<>% mutate(month = as.numeric(lubridate::month(date))) %>% 
-  filter(month >= 6 & month <= 8) %>% dplyr::select(-month)
-
-# Get year
-gls_daily %<>% mutate(year = format(as.Date(date, format = "%Y-%m-%d"),"%Y"))
-
-
-## Look for autocorrelation in foraging effort ---------------------------------
+### Look for autocorrelation in foraging effort --------------------------------
 
 # Remove examples where < 14 days of data
 gls_daily <- subset(gls_daily, !is.na(prop_forage.day))
@@ -620,17 +629,17 @@ dev.off()
 multi_behav <- gls_daily %>% filter(col_att.day < 0.95 & prop_flight.day < 0.95 & prop_rest.day < 0.95 & prop_forage.day < 0.95)
 
 ## Construct models for rest/flight/forage separately - proportion
-forageProp_glmm <- glmmTMB(prop_forage.day ~ col_lat + (1|year/ring), 
+forageProp_glmm <- glmmTMB(prop_forage.day ~ col_lat + (1|year) + (1|ring), 
                     family = beta_family(link = "logit"),
                     ziformula = ~.,
                     data = multi_behav)
 
-restProp_glmm <- glmmTMB(prop_rest.day ~ col_lat + (1|year/ring), 
+restProp_glmm <- glmmTMB(prop_rest.day ~ col_lat + (1|year) + (1|ring), 
                        family = beta_family(link = "logit"),
                        ziformula = ~.,
                        data = multi_behav)
 
-flightProp_glmm <- glmmTMB(prop_flight.day ~ col_lat + (1|year/ring), 
+flightProp_glmm <- glmmTMB(prop_flight.day ~ col_lat + (1|year) + (1|ring), 
                        family = beta_family(link = "logit"),
                        ziformula = ~.,
                        data = multi_behav)
@@ -652,30 +661,30 @@ multi_behav$rest_mins <- multi_behav$prop_rest.day * multi_behav$daylight.mins
 multi_behav$flight_mins <- multi_behav$prop_flight.day * multi_behav$daylight.mins
 
 # Fit models
-forageMins_lmm <- lmer(forage_mins ~ col_lat + (1|ring),
+forageMins_lmm <- lmer(forage_mins ~ col_lat + (1|ring) + (1|year),
                            data = multi_behav)
-forageMins_lmm.null <-  lmer(forage_mins ~ 1 + (1|ring),
+forageMins_lmm.null <-  lmer(forage_mins ~ 1 + (1|ring) + (1|year),
                              data = multi_behav)
+anova(forageMins_lmm, forageMins_lmm.null)
 
 
-
-restMins_lmm <- lmer(rest_mins ~ col_lat + (1|ring),
+restMins_lmm <- lmer(rest_mins ~ col_lat + (1|ring) + (1|year),
                        data = multi_behav)
-restMins_lmm.null <-  lmer(rest_mins ~ 1 + (1|ring),
+restMins_lmm.null <-  lmer(rest_mins ~ 1 + (1|ring) + (1|year),
                              data = multi_behav)
 anova(restMins_lmm, restMins_lmm.null)
 
 
-flightMins_lmm <- lmer(flight_mins ~ col_lat + (1|ring),
+flightMins_lmm <- lmer(flight_mins ~ col_lat + (1|ring) + (1|year),
                      data = multi_behav)
-flightMins_lmm.null <-  lmer(flight_mins ~ 1 + (1|ring),
+flightMins_lmm.null <-  lmer(flight_mins ~ 1 + (1|ring) + (1|year),
                            data = multi_behav)
-anova(flightMins_lmm, restMins_lmm.null)
+anova(flightMins_lmm, flightMins_lmm.null)
 
 
-#save(forageMins_lmm, file = "Data_outputs/forageMins_lmm.RData")
-#save(restMins_lmm, file = "Data_outputs/restMins_lmm.RData")
-#save(flightMins_lmm, file = "Data_outputs/flightMins_lmm.RData")
+# save(forageMins_lmm, file = "Data_outputs/forageMins_lmm.RData")
+# save(restMins_lmm, file = "Data_outputs/restMins_lmm.RData")
+# save(flightMins_lmm, file = "Data_outputs/flightMins_lmm.RData")
 
 load("Data_outputs/forageMins_lmm.RData")
 load("Data_outputs/restMins_lmm.RData")
@@ -697,7 +706,7 @@ beta_collat <- cond_coefs.forProp[2,1]
 
 means_cond_forage <- data.frame(latitude = latitudes)
 means_cond_forage$prob <- logit2prob(intercept + beta_collat * means_cond_forage$latitude)
-(means_cond_forage$prob[]*100) - (means_cond_forage$prob[2]*100)
+(means_cond_forage$prob[1]*100) - (means_cond_forage$prob[2]*100)
 
 
 # Rest #
@@ -884,18 +893,11 @@ dev.off()
 
 ## Model effects on colony attendance ==========================================
 
-# Prepare data
-
-gls_daily$col_mins <- gls_daily$col_att24*gls_daily$daylight.mins
-
-col_behav <- gls_daily %>%
-              dplyr::select(ring, date, col_att.day, n_recs.day, col_lat, year, col_mins) %>% 
-              filter(!is.na(n_recs.day))
-
 ### Construct models -----------------------------------------------------------
 
 # Fit proportional model
-colProp_BEINF <- gamlss(col_att.day ~ col_lat + re(random = ~1 | ring),
+colProp_BEINF <- gamlss(col_att.day ~ col_lat + 
+                        re(random = ~1 | ring) + re(random = ~1 | year),
                   nu.formula = ~col_lat, 
                   tau.formula = ~col_lat, 
                   family = BEINF,
@@ -905,22 +907,32 @@ colProp_BEINF <- gamlss(col_att.day ~ col_lat + re(random = ~1 | ring),
 load("Data_outputs/col_gamlss.RData")
 
 
-# Fit truncated model
+# Fit raw minutes 
+# These data are bounded but I can't see a way round this - no packages for Tobit
+# models with random effects
 
-## Set truncated parameters
-trunc <- gamlss.tr::trun(par = c(0,1440),
-             type = "both",
-             family = TF)
+## Set truncated parameters - this doesn't work due to error in the package
+# trunc <- gamlss.tr::trun(par = c(0,1440),
+#              type = "both",
+#              family = TF)
+# 
+# ## Fit model
+# colMins_TR <- gamlss(col_mins ~ col_lat + re(random = ~1 | ring),
+#                      family = trunc,
+#                      data = col_behav)
+# 
+# confint(colMins_TR)
+# 
+# #save(colMins_TR, file = "Data_outputs/col_truncated.RData")
+# load("Data_outputs/col_truncated.RData")
 
-## Fit model
-colMins_TR <- gamlss(col_mins ~ col_lat + re(random = ~1 | ring),
-                     family = trunc,
+colMins_lmm <- lmer(col_mins ~ col_lat + (1|ring),
+                     data = col_behav)
+colMins_lmm.null <- lmer(col_mins ~ 1 + (1|ring),
                      data = col_behav)
 
-confint(colMins_TR)
-
-#save(colMins_TR, file = "Data_outputs/col_truncated.RData")
-load("Data_outputs/col_truncated.RData")
+plot(colMins_lmm)
+anova(colMins_lmm, colMins_lmm.null)
 
 
 #### Explore results -----------------------------------------------------------
@@ -1025,32 +1037,8 @@ parameters_latitudes$tau_prob <- exp(intercept_tau + beta_collat_tau * parameter
 
 ##### ~ ## Minutes ## ----------------------------------------------------------
 
-colMins.summary <- summary(colMins_TR)
-
-## Get coefficients and confidence intervals
-
-# Isolate coefficient estimates and standard errors
-intercept <- colMins.summary[1]
-beta_collat <- colMins.summary[2]
-std_error_intercept <- colMins.summary[5]
-std_error_beta_collat <- colMins.summary[6]
-
-# Create dataframe
-colMins_pred <- data.frame(latitude = latitudes)
-
-# Calculate critical value confidence level
-z_critical <- qnorm(1 - 0.05 / 2)
-
-# Calculate standard error and margin of error
-colMins_pred$std_error_mean <- sqrt((std_error_intercept^2) + (colMins_pred$latitude^2) * (std_error_beta_collat^2))
-colMins_pred$margin_error <- z_critical * colMins_pred$std_error_mean
-
-# Calculate lower and upper bounds of confidence interval
-colMins_pred$lower_bound <- intercept + beta_collat * colMins_pred$latitude - colMins_pred$margin_error
-colMins_pred$upper_bound <- intercept + beta_collat * colMins_pred$latitude + colMins_pred$margin_error
-
-# Calculate predicted mean
-colMins_pred$pred <- intercept + beta_collat * colMins_pred$latitude
+summary(colMins_lmm)
+colMins_lmm.conf <- confint(colMins_lmm)
 
 ### Plotting ====================================================================
 
@@ -1110,27 +1098,29 @@ dev.off()
 
 #### Plot minutes effects ------------------------------------------------------
 
-mu_plot.mins <- ggplot() +
-  geom_ribbon(data = colMins_pred, aes(x = latitude, ymin = lower_bound , ymax = upper_bound), alpha = 0.25, col = "grey",
-              linetype = 2) +
-  geom_line(data = colMins_pred, aes(x = latitude, y = pred),
-            col = "brown2", lwd = 0.5) +
-  labs(y = "Minutes spent at colony",
-       x = expression("Colony latitude ("*~degree*" north)")) +
-   geom_point(data = col_behav[sample(nrow(col_behav), round(nrow(col_behav)/100) ),], 
-              aes(x = col_lat, y = col_mins)) +
-  ylim(c(0, 1440)) +
-  BLKI_theme
+# Make predictions
+summary(colMins_lmm)
 
+colMins_lmm.df <- data.frame(ggpredict(colMins_lmm, terms = "col_lat")) %>% 
+  rename(col_lat = x) 
+
+# Build the plot
+colMins_lmm.plot <- ggplot() +
+  geom_point(data = col_behav %>% sample_frac(0.1), aes(x = col_lat, y = col_mins)) +
+  geom_ribbon(data = colMins_lmm.df, aes(y = predicted, x = col_lat,
+                                           ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "coral") +
+  geom_line(data = colMins_lmm.df, aes(y = predicted, x = col_lat),
+            linewidth = 1, col = "red") +
+  labs(y = "Minutes spent at colony", x = "Colony latitude (°N)") +
+  BLKI_theme
 
 
 #### ~ FIGURE 7 ~ Effects of colony latitude on minutes colony attendance -------
 
 png("Figures/Figure 7_minutes_attendance.png", width = 7, height = 5, units = "in", res = 300)
-mu_plot.mins
+colMins_lmm.plot
 dev.off()
-
-
 
 
 # Model breeding success against latitude ======================================
@@ -1140,6 +1130,7 @@ breeding <- read.csv("Data_inputs/BLKI_breeding-success.csv")
 # Fix encoding issues
 breeding$colony[breeding$colony == "r\xf8st"] <- "røst"
 breeding$colony[breeding$colony == "bj\xf8rn\xf8ya"] <- "bjørnøya"
+breeding$colony[breeding$colony == "skj\xe1lfandi"] <- "skjalfandi"
 
 load("Data_inputs/BLKI_metadata.RData")
 meta$colony <- tolower(meta$colony)
@@ -1164,6 +1155,8 @@ breeding_sum <- breeding %>% group_by(colony, col_lat, col_lon) %>%
             var_success = var(large_chicks_per_nest, na.rm = TRUE)*(n_nests-1)/n_nests,
             sample_var = var(large_chicks_per_nest, na.rm = TRUE))
 
+breeding_sum <- breeding_sum[order(breeding_sum$col_lat),]
+
 # Build plots of mean and variance
 ## Mean plot
 ggplot() +
@@ -1177,13 +1170,19 @@ ggplot() +
   
 
 ## Variance plot
-ggplot() +
+breeding_var.plot <- ggplot() +
  geom_point(data = breeding_sum, aes(x = col_lat, y = var_success)) +
  geom_smooth(method = "lm", data = breeding_sum, aes(x = col_lat, y = sample_var), 
                 fill = "coral", col = "red") +
  labs(y = "Variance in number of chicks produced per nest", x = "Colony latitude (°N)") +
  BLKI_theme
-  
+
+
+#### ~ FIGURE S5: Breeding success variation with latitude --------------------------------
+
+png("Figures/Figure S5_breeding_variation.png", width = 7, height = 5, units = "in", res = 300)
+breeding_var.plot
+dev.off()
 
 ### Construct model -------------------------------------------------------------
 
@@ -1198,7 +1197,7 @@ breeding_lmm.null <- lmer(large_chicks_per_nest ~ 1 + (1|colony),
 
 anova(breeding_lmm, breeding_lmm.null)
 summary(breeding_lmm)
-
+confint(breeding_lmm)
 
 # Make predictions and plot them
 breeding_glmm.df <- data.frame(ggpredict(breeding_lmm, terms = "col_lat")) %>% 
@@ -1207,12 +1206,13 @@ breeding_glmm.df <- data.frame(ggpredict(breeding_lmm, terms = "col_lat")) %>%
 
 #### Build the final plot ------------------------------------------------------
 breeding_glmm.plot <- ggplot() +
-  geom_point(data = breeding, aes(x = col_lat, y = large_chicks_per_nest)) +
-  # geom_ribbon(data = breeding_glmm.df, aes(y = predicted, x = col_lat, 
-  #                                          ymin = conf.low, ymax = conf.high), 
+  geom_jitter(data = breeding, aes(x = col_lat, y = large_chicks_per_nest),
+             width = 0.3) +
+  # geom_ribbon(data = breeding_glmm.df, aes(y = predicted, x = col_lat,
+  #                                          ymin = conf.low, ymax = conf.high),
   #             alpha = 0.5, fill = "coral") +
   # geom_line(data = breeding_glmm.df, aes(y = predicted, x = col_lat),
-  #           linewidth = 1, col = "red") +
+  #           linewidth = 1, col = "red", linetype = "dashed") +
   labs(y = "Number of chicks produced per nest", x = "Colony latitude (°N)") +
   BLKI_theme
 

@@ -2,7 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
+.RDataTmp
 /Condor
+/Data_workshop
 /Data_outputs
 /Figures
 /Original data
