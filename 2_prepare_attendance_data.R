@@ -20,7 +20,7 @@ packages <- c("zoo", "stringr", "lubridate", "purrr", "dplyr", "suncalc", "magri
               "tidyr", "lutz")
 
 # Install packages not yet installed - change lib to library path
-#installed_packages <- packages %in% rownames(installed.packages())
+# installed_packages <- packages %in% rownames(installed.packages())
 
 # if (any(installed_packages == FALSE)) {
 #  install.packages(packages[!installed_packages])
@@ -232,6 +232,7 @@ new_IDs <- sprintf("%07d", 1:length(unique(kits.att_all$ring)))
 
 # Create a lookup table that maps original IDs to new IDs
 lookup_table <- data.frame(ring = unique(kits.att_all$ring), new_IDs = new_IDs)
+save(lookup_table, file = "rings_anonymised.RData")
 
 # Join the lookup table to the original dataframe, replacing original IDs with new IDs
 kits.att_all %<>% left_join(lookup_table, by = "ring") 
