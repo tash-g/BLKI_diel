@@ -5,9 +5,9 @@ Natasha Gillies, Sébastien Descamps, Frederick McKendrick, Samantha C. Patrick
 This repository contains scripts and data to recreate the main results and figures of this paper (currently in prep). 
 
 ## Scripts
-A short description of each script is given below.
+A short description of each script is given below. Note that the raw geolocator/salt-water immersion data is provided by the SEATRACK project and so is not shared here. Those interested in using these data should contact the authors/SEATRACK for further information.
 
-- **1_extract-trips-and-behaviour.R** Extracts colony visitation/foraging trips and at-sea behaviour (rest, flight, foraging) from salt water immersion data collected from geolocator devices. 
+- **1_extract-trips-and-behaviour.R** Extracts colony visitation/foraging trips and at-sea behaviour (rest, flight, foraging) from salt water immersion data collected from geolocator devices. Original salt water immersion data is not presented here (see above), but datasets in Data_inputs folder can be used to run the remaining scripts.
 - **2_prepare_attendance_data.R** Converts colony visitation data above into a time series for ACF analysis.
 - **3_statistical_analysis.R** Code and functions to carry out all statistical analyses in the manuscript. 
 - **3b_statistic_analysis-randomised-GAM.R** Randomly samples attendance data and fits to a GAM examining the predictive power of sun elevation angle on activity levels. Includes code to run the randomisation on a high-throughput system such as _Condor_.
@@ -81,15 +81,15 @@ These data are used in the above scripts. Note that all Rings/BirdIDs have been 
   - _col_lat_: Numeric latitude of colony
   - _col_lon_: Numeric longitude of colony
  
-- **BLKI_metadata.RData** Abridged dataset giving colony locations of each individual. Each row contains one individual bird. Data columns are as follows:
+- **BLKI_metadata_anon.RData** Abridged dataset giving colony locations of each individual. Each row contains one individual bird. Data columns are as follows:
   - _ring_: Factor encoding unique ID of bird
   - _colony_: Factor encoding the colony of provenance for the bird
   - _col_lat_: Numeric latitude of colony
   - _col_lon_: Numeric longitude of colony
     
-- **Grumant/NyAPyr/SEATRACK_GLS_processed.RData** Individual datasets separated by '/'. Datasets containing the raw immersion data for all birds, processed for consistent formatting and to calculate behavioural states. Each row indicates a 10 minute bout. Data columns are as follows:
-  - _datetime_: Datetime variable (POSIXct) indicating start time of 10 minute bout
-  - _immersion_: Numeric total salt water immersion recorded in the 10 minute bout. Geolocators sample every 3 seconds and log the total number of salt-water immersion events recorded every 10 minutes. Can therefore vary between 0 (no immersion) and 200 (complete immersion)
-  - _ring_: Factor encoding unique ID of bird
-  - _light_: Numeric light level recorded in lux
-  - _behaviour_: Factor indicating most probable behavioural state based on behaviour-finding algorithm
+- **temperature_data_2013-2022.Rdata** Gives hourly temperature values (degrees celsius) at each colony. Data columns are as follows:
+  - _col_lat_: Numeric latitude of colony
+  - _col_lon_: Numeric longitude of colony
+  - _datetime_: Datetime variable indicating date and hour of observation
+  - _temp_: Numeric temperature in degrees celsius
+  - _colony_: Factor encoding the colony of provenance for the bird

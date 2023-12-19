@@ -52,7 +52,7 @@ load("Data_inputs/BLKI_metadata.RData")
 meta %<>% distinct(ring, .keep_all = TRUE) 
 
 # Identify relevant files 
-gls_files <- list.files("Data_inputs")[grepl("GLS",list.files("Data_inputs"))][-1]
+gls_files <- list.files("Data_workshop/GLS Processed")[grepl("GLS",list.files("Data_workshop/GLS Processed"))][-1]
 
 # Loop through each file
 gls_trips_list <- vector(mode = "list", length = length(gls_files))
