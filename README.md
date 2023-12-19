@@ -5,7 +5,7 @@ Natasha Gillies, Sébastien Descamps, Frederick McKendrick, Samantha C. Patrick
 This repository contains scripts and data to recreate the main results and figures of this paper (currently in prep). 
 
 ## Scripts
-A short description of each script is given below. Note that the raw geolocator/salt-water immersion data is provided by the SEATRACK project and so is not shared here. Those interested in using these data should contact the authors/SEATRACK for further information.
+A short description of each script is given below. Note that the raw geolocator/salt-water immersion data are provided by the [SEATRACK](https://seapop.no/en/seatrack/) project and so are not shared here. Those interested in using these data should contact the authors/SEATRACK for further information.
 
 - **1_extract-trips-and-behaviour.R** Extracts colony visitation/foraging trips and at-sea behaviour (rest, flight, foraging) from salt water immersion data collected from geolocator devices. Original salt water immersion data is not presented here (see above), but datasets in Data_inputs folder can be used to run the remaining scripts.
 - **2_prepare_attendance_data.R** Converts colony visitation data above into a time series for ACF analysis.
