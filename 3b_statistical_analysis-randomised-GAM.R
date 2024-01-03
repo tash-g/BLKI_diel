@@ -105,7 +105,18 @@ resultsTable <- do.call("rbind", results_list)
 
 
 hist(resultsTable$sun.edf)
+
+## EDF distribution
 mean(resultsTable$sun.edf)
 # [1] 0.06358375
 sd(resultsTable$sun.edf)
 # [1] 8.825313
+
+## p value distribution
+mean(resultsTable$sun.p)
+# [1] 0
+sd(resultsTable$sun.p)
+# [1] 0
+
+
+
