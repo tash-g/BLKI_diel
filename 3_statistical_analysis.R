@@ -945,6 +945,10 @@ plot(colProp_BEINF)
 # Model summary and confidence intervals (using broom.mixed) - quite slow
 summary(colProp_BEINF)
 colProp_BEINF.summary <- broom.mixed::tidy(colProp_BEINF, conf.int = TRUE)
+
+#save(colProp_BEINF.summary, file = "Data_outputs/col_gamlss.summary.RData")
+load("Data_outputs/col_gamlss.summary.RData")
+
 colProp_BEINF.summary
 
 # parameter term        estimate std.error statistic   p.value conf.low conf.high
@@ -991,6 +995,8 @@ mu_latitudes$upper_bound_prob <- plogis(mu_latitudes$upper_bound)
 # Calculate probabilities
 mu_latitudes$prob <- plogis(intercept_mu + beta_collat_mu * mu_latitudes$latitude)
 
+### Change in colony attendance for 5 degree increase in latitude
+(mu_latitudes$prob[2] - mu_latitudes$prob[1])*100
 
 
 # Estimates and confint - nu and tau #
@@ -1030,15 +1036,30 @@ parameters_latitudes$upper_bound_nu_exp <- exp(parameters_latitudes$upper_bound_
 parameters_latitudes$lower_bound_tau_exp <- exp(parameters_latitudes$lower_bound_tau)
 parameters_latitudes$upper_bound_tau_exp <- exp(parameters_latitudes$upper_bound_tau)
 
-# Get exponentiates probabilities
+# Get exponentiated probabilities
 parameters_latitudes$nu_prob <- exp(intercept_nu + beta_collat_nu * parameters_latitudes$latitude)
 parameters_latitudes$tau_prob <- exp(intercept_tau + beta_collat_tau * parameters_latitudes$latitude)
 
 
+### Change in p no or constant colony attendance for 5 degree increase in latitude
+(parameters_latitudes$nu_prob[2] - parameters_latitudes$nu_prob[1])*100
+(parameters_latitudes$tau_prob[2] - parameters_latitudes$tau_prob[1])*100
+
+
 ##### ~ ## Minutes ## ----------------------------------------------------------
 
-summary(colMins_lmm)
+colMins_lmm.summary <- summary(colMins_lmm)
 colMins_lmm.conf <- confint(colMins_lmm)
+
+## Percentage increase for 5 degree change in latitude
+intercept_lmm <- colMins_lmm.summary$coefficients[1]
+beta_collat_lmm <- colMins_lmm.summary$coefficients[2]
+
+(((intercept_lmm + beta_collat_lmm*50) - (intercept_lmm + beta_collat_lmm*45)) / 
+  (intercept_lmm + beta_collat_lmm*50)) * 100
+
+
+
 
 ### Plotting ====================================================================
 
@@ -1064,7 +1085,7 @@ nu_plot.prob <- ggplot() +
               linetype = 2) +
   geom_line(data = parameters_latitudes, aes(x = latitude, y = nu_prob),
             col = "brown1", lwd = 0.4) +
-  labs(y = "p | spend all daylight at the colony",
+  labs(y = "p | spend none of daylight at the colony",
        x = expression("Colony latitude ("*~degree*" north)"),
        tag = "(B)") +
   geom_rug(data = col_behav, aes(x = col_lat, y = col_att.day), sides = "b") +
@@ -1079,7 +1100,7 @@ tau_plot.prob <- ggplot() +
               linetype = 2) +
   geom_line(data = parameters_latitudes, aes(x = latitude, y = tau_prob),
             col = "brown1", lwd = 0.4) +
-  labs(y = "p | spend none of daylight at the colony",
+  labs(y = "p | spend all of daylight at the colony",
        x = expression("Colony latitude ("*~degree*" north)"),
        tag = "(C)") +
   geom_rug(data = col_behav, aes(x = col_lat, y = col_att.day), sides = "b") +
