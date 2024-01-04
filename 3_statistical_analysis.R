@@ -536,6 +536,21 @@ load("Data_outputs/subsampled_kits.RData")
 
 random_sample$date <- as.Date(random_sample$datetime)
 
+## Do the same for Arctic colonies 
+high_lat <- subset(kits.att_all, col_lat > 72)
+
+# Subset the data
+set.seed(817)
+high_lat.random <- subsample_by_hours(high_lat, 72)
+
+high_lat.random[,c(3, 7)] <- lapply(high_lat.random[,c(3, 7)], as.factor)
+high_lat.random$ring <- as.factor(high_lat.random$ring)
+high_lat.random$date <- as.Date(high_lat.random$datetime)
+
+#save(high_lat.random, file = "Data_outputs/high_lat_subsampled_kits.RData")
+load("Data_outputs/high_lat_subsampled_kits.RData")
+
+
 
 ### Fit the model --------------------------------------------------------------
 
@@ -549,6 +564,16 @@ load("Data_outputs/To delete/GAM_immersion_sun.RData")
 gam.check(gam_model)
 summary(gam_model)
 
+## Do the same for Arctic colonies 
+high_lat.gam_model <- mgcv::gam(total_imm ~ s(sun_altitude) +
+                         s(ring, bs = 're'), 
+                       data = high_lat.random)
+
+#save(high_lat.gam_model, file = "Data_outputs/high_lat_GAM_immersion_sun.RData")
+load("Data_outputs/To delete/high_lat_GAM_immersion_sun.RData")
+
+gam.check(high_lat.gam_model)
+summary(high_lat.gam_model)
 
 
 ### ~ FIGURE 4 ~ Immersion against sun elevation angle -------------------------
@@ -721,7 +746,7 @@ means_cond_rest$prob <- logit2prob(intercept + beta_collat * means_cond_rest$lat
 (means_cond_rest$prob[1]*100) - (means_cond_rest$prob[2]*100)
 
 # Flight #
-cond_coefs.flightProp <-  summary(flightProp_glmm)$coefficients$zi
+cond_coefs.flightProp <-  summary(flightProp_glmm)$coefficients$cond
 confint(flightProp_glmm)
 
 intercept <-  cond_coefs.flightProp[1,1]
@@ -1148,22 +1173,27 @@ dev.off()
 
 ### Load and process data -------------------------------------------------------
 breeding <- read.csv("Data_inputs/BLKI_breeding-success.csv")
+
 # Fix encoding issues
 breeding$colony[breeding$colony == "r\xf8st"] <- "røst"
 breeding$colony[breeding$colony == "bj\xf8rn\xf8ya"] <- "bjørnøya"
 breeding$colony[breeding$colony == "skj\xe1lfandi"] <- "skjalfandi"
 
-load("Data_inputs/BLKI_metadata.RData")
+load("Data_inputs/BLKI_metadata_anon.RData")
 meta$colony <- tolower(meta$colony)
 meta %<>% distinct(colony, .keep_all = TRUE) %>% dplyr::select(-ring)
 
 breeding <- merge(breeding, meta, by = "colony")
 
+# NB. Isfjorden and Kongsfjorden record RS as a binomial variable so need to be excluded
+breeding <- subset(breeding, colony != "isfjorden" & colony != "kongsfjorden")
 
 ## Get mean number of nests per colony and year
 mean_nests <- breeding %>% group_by(colony) %>% summarise(mean_nests = mean(n_nests, na.rm = T))
 mean(mean_nests$mean_nests, na.rm = TRUE)
 range(mean_nests$mean_nests, na.rm = TRUE)
+
+
 
 #### Visualise the breeding success relationship ---------------------------------
 
@@ -1175,33 +1205,6 @@ breeding_sum <- breeding %>% group_by(colony, col_lat, col_lon) %>%
             sample_var = var(large_chicks_per_nest, na.rm = TRUE))
 
 breeding_sum <- breeding_sum[order(breeding_sum$col_lat),]
-
-# Build plots of mean and variance
-## Mean plot
-ggplot() +
-  geom_point(data = breeding, aes(x = col_lat, y = large_chicks_per_nest)) +
-  geom_smooth(method = "lm", data = breeding_sum, aes(x = col_lat, y = mean_success), 
-              fill = "coral", col = "red") +
-  labs(y = "Number of chicks produced per nest", x = "Colony latitude (°N)") +
-  scale_y_continuous(breaks = seq(0, 1.5, 0.5)) +
-  ylim(0, 1.5) +
-  BLKI_theme
-  
-
-## Variance plot
-breeding_var.plot <- ggplot() +
- geom_point(data = breeding_sum, aes(x = col_lat, y = var_success)) +
- geom_smooth(method = "lm", data = breeding_sum, aes(x = col_lat, y = sample_var), 
-                fill = "coral", col = "red") +
- labs(y = "Variance in number of chicks produced per nest", x = "Colony latitude (°N)") +
- BLKI_theme
-
-
-#### ~ FIGURE S5: Breeding success variation with latitude --------------------------------
-
-png("Figures/Figure S5_breeding_variation.png", width = 7, height = 5, units = "in", res = 300)
-breeding_var.plot
-dev.off()
 
 ### Construct model -------------------------------------------------------------
 
@@ -1223,10 +1226,11 @@ breeding_glmm.df <- data.frame(ggpredict(breeding_lmm, terms = "col_lat")) %>%
   rename(col_lat = x) 
 
 
-#### Build the final plot ------------------------------------------------------
+#### ~ FIGURE S6: Breeding success with latitude --------------------------------
+
 breeding_glmm.plot <- ggplot() +
   geom_jitter(data = breeding, aes(x = col_lat, y = large_chicks_per_nest),
-             width = 0.3) +
+              width = 0.3) +
   # geom_ribbon(data = breeding_glmm.df, aes(y = predicted, x = col_lat,
   #                                          ymin = conf.low, ymax = conf.high),
   #             alpha = 0.5, fill = "coral") +
@@ -1235,127 +1239,22 @@ breeding_glmm.plot <- ggplot() +
   labs(y = "Number of chicks produced per nest", x = "Colony latitude (°N)") +
   BLKI_theme
 
-#### ~ FIGURE 8: Breeding success with latitude --------------------------------
-
-png("Figures/Figure 8_breeding_success.png", width = 7, height = 5, units = "in", res = 300)
+png("Figures/Figure S6_breeding_success.png", width = 7, height = 5, units = "in", res = 300)
 breeding_glmm.plot
 dev.off()
 
 
-# APPENDIX ----------------------------------------------------------------
+#### ~ FIGURE S7: Breeding success variation with latitude --------------------------------
 
+## Variance plot
+breeding_var.plot <- ggplot() +
+  geom_point(data = breeding_sum, aes(x = col_lat, y = var_success)) +
+  # geom_smooth(method = "lm", data = breeding_sum, aes(x = col_lat, y = sample_var), 
+  #             fill = "coral", col = "red") +
+  labs(y = "Variance in number of chicks produced per nest", x = "Colony latitude (°N)") +
+  BLKI_theme
 
-## Construct multivariate model to examine rest/flight/forage simultaneously
-
-# Melt responses into a long format
-behaviour_long <- melt(multi_behav, id.vars = c("col_lat", "ring", "n_recs24", "year", "daylight.mins"),
-                       measure.vars = c("prop_forage.day", "prop_rest.day", "prop_flight.day"),
-                       variable.name = "behaviour", value.name = "proportion")
-
-# Construct the model
-multiMod <- glmmTMB(proportion ~ daylight.mins * behaviour + (1|ring), 
-                    family = beta_family(link = "logit"),
-                    ziformula = ~.,
-                    data = behaviour_long)
-
-
-
-## Get interaction effects
-
-## Intercept and overall values for each behaviour don't matter - these are 
-## estimates of proportion when col_lat = 0. Only interested in effect of col lat 
-## and interaction
-
-# Critical value for confidence intervals
-critical_value <- qnorm((1 + 0.95) / 2)
-
-# Conditional model
-cond_coefs <- multiMod_summary$coefficients$cond
-cond_vcov <- vcov(multiMod)$cond
-
-
-## Rest
-calc_test_statistics(cond_coefs, cond_vcov, 2, 5)
-#   beta           se   lower_conf   upper_conf   z_score p_value
-#1 -0.009127003 0.0007502676 -0.0105975 -0.007656505 -12.165       0
-## Flight
-calc_test_statistics(cond_coefs, cond_vcov, 2, 6)
-#    beta           se   lower_conf    upper_conf   z_score    p_value
-# 1 -0.003233648 0.0007100692 -0.004625358 -0.001841938 -4.55399 5.263795e-06
-
-
-# Estimated marginal means for foraging and flight
-latitudes <- seq(45, 80, by = 5)
-intercept <-  -0.183 
-beta_collat <- -0.0134072
-
-means_cond_forage <- data.frame(latitude = latitudes)
-means_cond_forage$prob <- logit2prob(intercept + beta_collat * means_cond_forage$latitude)
-(means_cond_forage$prob[1]*100) - (means_cond_forage$prob[2]*100)
-
-# Same for flight
-beta_collat <- -0.001315552
-
-means_cond_flight <- data.frame(latitude = latitudes)
-means_cond_flight$prob <- logit2prob(intercept + beta_collat * means_cond_flight$latitude)
-(means_cond_flight$prob[1]*100) - (means_cond_flight$prob[2]*100)
-
-
-effects_forage <- ggeffects::ggpredict(multiMod, terms = c("col_lat", "behaviour [prop_forage.day]"))
-effects_flight <- ggeffects::ggpredict(multiMod, terms = c("col_lat", "behaviour [prop_flight.day]"))
-
-
-# Zero inflated model
-zi_coefs <- multiMod_summary$coefficients$zi
-ze_vcov <- vcov(multiMod)$zi
-
-# Rest
-calc_test_statistics(zi_coefs, zi_vcov, 2, 5)
-#    beta          se  lower_conf  upper_conf   z_score    p_value
-# 1 -0.004679466 0.003267947 -0.01108452 0.001725593 -1.431928 0.1521643
-# Flight
-calc_test_statistics(zi_coefs, zi_vcov, 2, 6)
-#   beta           se   lower_conf    upper_conf   z_score    p_value
-# 1 -0.01501392 0.003258953 -0.02140135 -0.008626493 -4.606978 4.085636e-06
-
-
-# Estimated marginal means for zero-inflation foraging
-latitudes <- seq(45, 80, by = 5)
-intercept <-  -2.18 
-beta_collat <- -0.0346
-
-means_zi_forage <- data.frame(latitude = latitudes)
-means_zi_forage$prob <- logit2prob(intercept + beta_collat * means_zi_forage$latitude)
-
-# Same for flight
-latitudes <- seq(45, 80, by = 5)
-intercept <-  -2.18 
-beta_collat <- -0.02427242
-
-means_zi_flight <- data.frame(latitude = latitudes)
-means_zi_flight$prob <- logit2prob(intercept + beta_collat * means_zi_flight$latitude)
-
-
-## Tidied coefficients table
-
-broom.mixed::tidy(multiMod, conf.int = TRUE)
-
-# effect   component group term                             estimate std.error statistic    p.value conf.low conf.high
-# <chr>    <chr>     <chr> <chr>                               <dbl>     <dbl>     <dbl>      <dbl>    <dbl>     <dbl>
-#  1 fixed    cond      NA    (Intercep… -0.102    0.0593       -1.73  8.40e-  2 -0.219     0.0138 
-#  2 fixed    cond      NA    col_lat    -0.0163   0.000709    -22.9   1.72e-116 -0.0177   -0.0149 
-#  3 fixed    cond      NA    behaviour… -1.19     0.0321      -37.1   2.13e-301 -1.25     -1.13   
-#  4 fixed    cond      NA    behaviour… -1.07     0.0271      -39.6   0         -1.13     -1.02   
-#  5 fixed    cond      NA    col_lat:b…  0.00714  0.000460     15.5   2.70e- 54  0.00624   0.00804
-#  6 fixed    cond      NA    col_lat:b…  0.0130   0.000389     33.5   4.17e-246  0.0123    0.0138 
-#  7 fixed    zi        NA    (Intercep… -4.29     0.244       -17.6   1.69e- 69 -4.77     -3.82   
-#  8 fixed    zi        NA    col_lat     0.00874  0.00326       2.68  7.31e-  3  0.00235   0.0151 
-#  9 fixed    zi        NA    behaviour…  3.89     0.147        26.5   1.04e-154  3.61      4.18   
-# 10 fixed    zi        NA    behaviour… -0.656    0.424        -1.55  1.22e-  1 -1.49      0.175  
-# 11 fixed    zi        NA    col_lat:b… -0.0134   0.00209      -6.43  1.28e- 10 -0.0175   -0.00933
-# 12 fixed    zi        NA    col_lat:b… -0.0238   0.00612      -3.88  1.04e-  4 -0.0358   -0.0118 
-# 13 ran_pars cond      ring  sd__(Inte…  0.149   NA            NA    NA          0.142     0.157  
-# 14 ran_pars cond      year  sd__(Inte…  0.0972  NA            NA    NA          0.0623    0.152  
-# 15 ran_pars zi        ring  sd__(Inte…  0.594   NA            NA    NA          0.564     0.626  
-# 16 ran_pars zi        year  sd__(Inte…  0.235   NA            NA    NA          0.145     0.379 
+png("Figures/Figure S7_breeding_variation.png", width = 7, height = 5, units = "in", res = 300)
+breeding_var.plot
+dev.off()
 
