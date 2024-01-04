@@ -537,10 +537,10 @@ load("Data_outputs/subsampled_kits.RData")
 random_sample$date <- as.Date(random_sample$datetime)
 
 ## Do the same for Arctic colonies 
-high_lat <- subset(kits.att_all, col_lat > 72)
+high_lat <- subset(kits.att_all, col_lat > 66.5)
 
 # Subset the data
-set.seed(817)
+set.seed(718)
 high_lat.random <- subsample_by_hours(high_lat, 72)
 
 high_lat.random[,c(3, 7)] <- lapply(high_lat.random[,c(3, 7)], as.factor)
@@ -574,7 +574,7 @@ load("Data_outputs/To delete/high_lat_GAM_immersion_sun.RData")
 
 gam.check(high_lat.gam_model)
 summary(high_lat.gam_model)
-
+plot(high_lat.gam_model)
 
 ### ~ FIGURE 4 ~ Immersion against sun elevation angle -------------------------
 
@@ -594,10 +594,33 @@ gam_immersion.plot <- ggplot(sm_df, aes(x = x, y = fit)) +
        y = "Predicted immersion") +
   BLKI_theme 
 
-
 png("Figures/Figure 4_GAM_imm_by_sun.png", 
     width = 7, height = 5, units = "in", res = 600)
 gam_immersion.plot
+dev.off()
+
+### ~ FIGURE S6 ~ High latitude sun elevation -----------------------------------
+
+# Process data for plotting
+p_obj.high <- plot(high_lat.gam_model, residuals = TRUE)
+p_obj.high <- p_obj.high[[1]] # just one smooth so select the first component
+sm_df.high <- as.data.frame(p_obj.high[c("x", "se", "fit")])
+sm_df.high$fit <- sm_df.high$fit + coef(high_lat.gam_model)[1]
+data_df.high <- as.data.frame(p_obj.high[c("raw", "p.resid")])
+
+# Build the plot
+high_lat_gam_immersion.plot <- ggplot(sm_df.high, aes(x = x, y = fit)) +
+  geom_ribbon(aes(ymin = fit - se, ymax = fit + se, y = NULL),
+              alpha = 0.25, col = "grey", linetype = 2) +
+  geom_line(col = "brown2", lwd = 0.5) +
+  labs(x = expression("Sun elevation angle ("*~degree*")"),
+       y = "Predicted immersion") +
+  BLKI_theme 
+
+
+png("Figures/Figure S6_high_GAM_imm_by_sun.png", 
+    width = 7, height = 5, units = "in", res = 600)
+high_lat_gam_immersion.plot
 dev.off()
 
 # Assess effects on behaviour ==================================================
@@ -1206,6 +1229,7 @@ breeding_sum <- breeding %>% group_by(colony, col_lat, col_lon) %>%
 
 breeding_sum <- breeding_sum[order(breeding_sum$col_lat),]
 
+
 ### Construct model -------------------------------------------------------------
 
 # Remove NA values
@@ -1226,7 +1250,7 @@ breeding_glmm.df <- data.frame(ggpredict(breeding_lmm, terms = "col_lat")) %>%
   rename(col_lat = x) 
 
 
-#### ~ FIGURE S6: Breeding success with latitude --------------------------------
+#### ~ FIGURE S7: Breeding success with latitude --------------------------------
 
 breeding_glmm.plot <- ggplot() +
   geom_jitter(data = breeding, aes(x = col_lat, y = large_chicks_per_nest),
@@ -1239,12 +1263,12 @@ breeding_glmm.plot <- ggplot() +
   labs(y = "Number of chicks produced per nest", x = "Colony latitude (°N)") +
   BLKI_theme
 
-png("Figures/Figure S6_breeding_success.png", width = 7, height = 5, units = "in", res = 300)
+png("Figures/Figure S7_breeding_success.png", width = 7, height = 5, units = "in", res = 300)
 breeding_glmm.plot
 dev.off()
 
 
-#### ~ FIGURE S7: Breeding success variation with latitude --------------------------------
+#### ~ FIGURE S8: Breeding success variation with latitude --------------------------------
 
 ## Variance plot
 breeding_var.plot <- ggplot() +
@@ -1254,7 +1278,7 @@ breeding_var.plot <- ggplot() +
   labs(y = "Variance in number of chicks produced per nest", x = "Colony latitude (°N)") +
   BLKI_theme
 
-png("Figures/Figure S7_breeding_variation.png", width = 7, height = 5, units = "in", res = 300)
+png("Figures/Figure S8_breeding_variation.png", width = 7, height = 5, units = "in", res = 300)
 breeding_var.plot
 dev.off()
 
