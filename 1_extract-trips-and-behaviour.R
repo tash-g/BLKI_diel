@@ -48,11 +48,11 @@ thresh.immersion <- 15
 # Huge amount of data - so loop through previously subsetted files individually
 
 # Load metadata file
-load("Data_inputs/BLKI_metadata.RData")
+load("Data_workshop/BLKI_metadata.RData")
 meta %<>% distinct(ring, .keep_all = TRUE) 
 
 # Identify relevant files 
-gls_files <- list.files("Data_workshop/GLS Processed")[grepl("GLS",list.files("Data_workshop/GLS Processed"))][-1]
+gls_files <- list.files("Data_workshop/GLS Processed")[grepl("GLS",list.files("Data_workshop/GLS Processed"))]
 
 # Loop through each file
 gls_trips_list <- vector(mode = "list", length = length(gls_files))
@@ -62,20 +62,25 @@ gls_hourly_behaviour_list <- vector(mod = "list", length = length(gls_files))
 
 for (i in 1:length(gls_files)) {
   
-  print(paste0("Processing file ", i, " of ", length(gls_files)))
-  
+  pb <- txtProgressBar(min = 0, max = length(gls_files), style = 3)
+  setTxtProgressBar(pb, i)
+
   ### FILE LOOP - LOAD FILES ---------------------------------------------------
   
-  load(paste0("Data_inputs/", gls_files[i]))
+  load(paste0("Data_workshop/", gls_files[i]))
 
   # Make date a posixct variable
   gls$datetime <- as.POSIXct(gls$datetime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  
+ 
   # Merge metadata
   gls <- merge(gls, meta, by = "ring", all.x = TRUE)
   
+  # Make sure only have data up to 2022
+  gls$yr <- format(gls$datetime, "%Y")
+  
   # Get ringyr for processing
-  gls$ringYr <- paste(gls$ring, format(gls$datetime, "%Y"), sep = "_")
+  gls$ringYr <- paste(gls$ring, gls$yr, sep = "_")
+  gls %<>% filter(yr != "2023") %>% select(-yr)
 
     ### Calculate rolling mean and add threshold immersion parameters ------------
   glsDat <- gls %>%
@@ -276,6 +281,8 @@ for (i in 1:length(gls_files)) {
   gls_hourly_behaviour_list[[i]] <- hourBehaviour
   
 }
+
+close(pb)
 
 gls_trips <- data.table::rbindlist(gls_trips_list)
 gls_daily <- data.table::rbindlist(gls_daily_behaviour_list)
