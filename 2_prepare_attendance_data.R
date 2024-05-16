@@ -59,7 +59,8 @@ kit.list <- vector(mode = "list", length = length(years))
 
 for (i in 1:length(years)) {
   
-  print(paste0("Processing year ", i, " (", years[i], ")", " of ", length(years)))
+  pb <- txtProgressBar(min = 0, max = length(years), style = 3)
+  setTxtProgressBar(pb, i)
   
   trips_year <- subset(gls_trips, year == years[i])
   
@@ -201,9 +202,9 @@ for (i in 1:length(years)) {
   
   ### Clean up dataset ---------------------------------------------------------
   
-  # Make sure only have data in June/July/Aug (breeding season)
+  # Make sure only have data in May/June/July (breeding season)
   kits.att %<>% mutate(month = as.numeric(lubridate::month(datetime))) %>% 
-    filter(month >= 6 & month <= 8) %>% dplyr::select(-month)
+    filter(month >= 5 & month <= 7) %>% dplyr::select(-month)
   
   # Change datetime to local time to avoid confusion
   kits.att$datetime <- kits.att$local_time
@@ -221,23 +222,9 @@ for (i in 1:length(years)) {
 }
   
 kits.att_all <- do.call("rbind", kit.list)
+close(pb)
 
 beepr::beep(8)
-
-
-
-### Anonymise ring numbers -----------------------------------------------------
-
-new_IDs <- sprintf("%07d", 1:length(unique(kits.att_all$ring)))
-
-# Create a lookup table that maps original IDs to new IDs
-lookup_table <- data.frame(ring = unique(kits.att_all$ring), new_IDs = new_IDs)
-save(lookup_table, file = "rings_anonymised.RData")
-
-# Join the lookup table to the original dataframe, replacing original IDs with new IDs
-kits.att_all %<>% left_join(lookup_table, by = "ring") 
-kits.att_all$ring <- kits.att_all$new_IDs
-kits.att_all$new_IDs <- NULL
 
 # Output the dataframe ---------------------------------------------------------
 save(kits.att_all, file = "Data_inputs/BLKI_attendance_2013-2022.RData")

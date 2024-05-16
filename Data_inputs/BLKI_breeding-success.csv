@@ -173,7 +173,7 @@ year,n_nests,large_chicks_per_nest,colony
 2016,641,0.596,runde
 2017,657,0.682,runde
 2018,615,0.724,runde
-2019,633,0.750,runde
+2019,633,0.75,runde
 2020,694,0.807,runde
 2021,700,0.746,runde
 2022,732,0.639,runde
@@ -194,3 +194,12 @@ year,n_nests,large_chicks_per_nest,colony
 2020,915,0.528,anda
 2021,875,0.375,anda
 2022,745,0.016,anda
+2013,616,1.10, hornøya
+2014,43,0.30, hornøya
+2015,57,0.10, hornøya
+2016,15,0.47, hornøya
+2017,20,0.30, hornøya
+2018,160,1.04, hornøya
+2019,18,0.00, hornøya
+2020,60,0.00, hornøya
+2021,153,0.00, hornøya
