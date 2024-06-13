@@ -1,5 +1,5 @@
-# Evidence for latitude-driven changes in circadian rhythm in a wide-ranging seabird 
-Natasha Gillies, Sébastien Descamps, Frederick McKendrick, Samantha C. Patrick
+# Evidence for latitude-driven changes in diel rhythms in a wide-ranging seabird 
+Natasha Gillies, Sébastien Descamps, Nicholas P. Huffeldt, Frederick McKendrick, Tycho Anker-Nilssen, Maria Bogdanova, Vegard Sandøy Bråthen, Olivier Chastel, Signe Christensen-Dalsgaard, Francis Daunt, Nina Dehnhard, Alexey Viktorovich Ezhov, Annette Fayet, Morten Frederiksen, Maria Gavrilo, April Hedd, Yann Kolbeinsson, Yuri Vladimirovich Krasnov, Aili Labansen, Jannie Linnebjerg, Svein-Håkon Lorentsen, Flemming R. Merkel, Børge Moe, Mark Newell, Stephen Newton, Bergur Olsen, Tone Reiertsen, Greg Robertson, Hallvard Strøm, Thorkell Lindberg Thorarinsson, Samantha C. Patrick
 
 ## Overview
 This repository contains scripts and data to recreate the main results and figures of this paper (currently in prep). 
