@@ -59,7 +59,6 @@ gls_trips_list <- vector(mode = "list", length = length(gls_files))
 gls_daily_behaviour_list <- vector(mode = "list", length = length(gls_files))
 gls_hourly_behaviour_list <- vector(mod = "list", length = length(gls_files))
 
-
 for (i in 1:length(gls_files)) {
   
   pb <- txtProgressBar(min = 0, max = length(gls_files), style = 3)
@@ -67,7 +66,7 @@ for (i in 1:length(gls_files)) {
 
   ### FILE LOOP - LOAD FILES ---------------------------------------------------
   
-  load(paste0("Data_workshop/", gls_files[i]))
+  load(paste0("Data_workshop/GLS Processed/", gls_files[i]))
 
   # Make date a posixct variable
   gls$datetime <- as.POSIXct(gls$datetime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
