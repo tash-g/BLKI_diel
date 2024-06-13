@@ -56,7 +56,6 @@ years <- unique(gls_trips$year)
 years <- years[order(years)]
 kit.list <- vector(mode = "list", length = length(years))
 
-
 for (i in 1:length(years)) {
   
   pb <- txtProgressBar(min = 0, max = length(years), style = 3)

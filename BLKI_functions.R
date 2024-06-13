@@ -314,10 +314,12 @@ find_behaviour <- function(immersionValues) {
   next_immersion <- c(immersionValues[2:length(immersionValues)], NA)
   prev_immersion <- c(NA, immersionValues[1:length(immersionValues) - 1])
   
-  behaviour[immersionValues <= max(immersionValues*0.02)] <- "flight"
+  behaviour[immersionValues <= max(immersionValues*0.10) &
+              ( next_immersion == min(immersionValues) |
+                  prev_immersion == min(immersionValues) )] <- "flight"
   behaviour[immersionValues >= max(immersionValues*0.90) &
-              next_immersion == max(immersionValues) |
-              prev_immersion == max(immersionValues)] <- "rest"
+             ( next_immersion == max(immersionValues) |
+              prev_immersion == max(immersionValues) )] <- "rest"
   behaviour[behaviour == "NA"] <- "foraging"
   
   return(behaviour)
