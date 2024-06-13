@@ -11,6 +11,7 @@ A short description of each script is given below. Note that the raw geolocator/
 - **2_prepare_attendance_data.R** Converts colony visitation data above into a time series for ACF analysis.
 - **3_statistical_analysis.R** Code and functions to carry out all statistical analyses in the manuscript. 
 - **3b_statistic_analysis-randomised-GAM.R** Randomly samples attendance data and fits to a GAM examining the predictive power of sun elevation angle on activity levels. Includes code to run the randomisation on a high-throughput system such as _Condor_.
+- **4_individual-LombScargle_periodograms.R** Code and to construct and analyse individual periods by constructing periodograms.
 - **BLKI_functions.R** Contains custom functions to run each of the above scripts. Must be run for the scripts to work effectively.
 
 ## Data inputs
@@ -36,12 +37,6 @@ These data are used in the above scripts. Note that all Rings/BirdIDs have been 
   - _sun altitude_: Numeric sun altitude, in degrees. Sun altitude is the angular elevation of the center of the solar disk above the horizon
   - _temp_: Numeric temperature in degrees celsius
   - _hour_: Numeric value for hour of day; 24-hour format
-
-- **BLKI_breeding-success.csv** Gives population-level annual breeding success for each colony. Data columns are as follows:
-  - _year_: Factor encoding year of record
-  - _n_nests_: Number of nests data collected from
-  - _large_chicks_per_nest_: Numeric proportion of nests producing large chicks - this is our measure of breeding success
-  - _colony_: Factor encoding the colony from which data were collected
 
 - **BLKI_gls-daily-behaviour.RData** Dataset summarising daily behaviour for each bird. Data colums are as follows:
   - _ring_: Factor encoding unique ID of bird
@@ -86,10 +81,3 @@ These data are used in the above scripts. Note that all Rings/BirdIDs have been 
   - _colony_: Factor encoding the colony of provenance for the bird
   - _col_lat_: Numeric latitude of colony
   - _col_lon_: Numeric longitude of colony
-    
-- **temperature_data_2013-2022.Rdata** Gives hourly temperature values (degrees celsius) at each colony. Data columns are as follows:
-  - _col_lat_: Numeric latitude of colony
-  - _col_lon_: Numeric longitude of colony
-  - _datetime_: Datetime variable indicating date and hour of observation
-  - _temp_: Numeric temperature in degrees celsius
-  - _colony_: Factor encoding the colony of provenance for the bird
