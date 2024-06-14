@@ -2,7 +2,6 @@
 # Script: 3b_statistical_analysis-randomised-GAM.R
 # Author: Dr Natasha Gillies
 # Purpose: Randomise data used in the GAM of immersion against sun elevation
-# Notes:
 # Date: 2023-09-20
 # -------------------------------------
 

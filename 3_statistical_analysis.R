@@ -13,8 +13,6 @@
 ## Methods guided by those outlined in : 
 ## Huffeldt Nicholas Per and Merkel Flemming R. 2016 Sex-specific, inverted 
 ## rhythms of breeding-site attendance in an Arctic seabird. Biol. Lett. 122016028920160289
-## 
-## OUTSTANDING ISSUES: CHANGE COL MINS TO COL HOURS (SYNTAX ONLY)
 ##
 ## ---------------------------
 
@@ -45,18 +43,6 @@ out.path <- "./Data_outputs/"
 # if(dir.exists(out.path) == FALSE) {
 #   dir.create(out.path)
 # }
-
-
-# Overdispersion function (Ben Bolker)
-
-overdisp_fun <- function(model) {
-  rdf <- df.residual(model)
-  rp <- residuals(model,type="pearson")
-  Pearson.chisq <- sum(rp^2)
-  prat <- Pearson.chisq/rdf
-  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
-  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
-}
 
 
 # Load & process data ==========================================================
@@ -126,12 +112,12 @@ gls_daily %<>% mutate(year = format(as.Date(date, format = "%Y-%m-%d"),"%Y"))
 ### Colony attendance data -----------------------------------------------------
 
 # Prepare data
-gls_daily$col_mins <- gls_daily$col_att24*gls_daily$daylight.mins
+gls_daily$col_hrs <- gls_daily$col_att24*gls_daily$daylight.mins
 
 col_behav <- gls_daily %>%
-  dplyr::select(ring, date, col_att.day, n_recs.day, col_lat, year, col_mins, colony) %>% 
+  dplyr::select(ring, date, col_att.day, n_recs.day, col_lat, year, col_hrs, colony) %>% 
   filter(!is.na(n_recs.day)) %>%
-  mutate(col_mins = col_mins/60)
+  mutate(col_hrs = col_hrs/60) %>% select(-col_hrs)
 
 # ==============================================================================
 # Latitudinal variation in rhythmicity and period length =======================
@@ -600,11 +586,10 @@ dev.off()
 # Remove full day colony visits
 multi_behav <- gls_daily %>% filter(col_att.day < 0.95 & prop_flight.day < 0.95 & prop_rest.day < 0.95 & prop_forage.day < 0.95)
 
-## Calculate mins
-#multi_behav$daylight.mins[multi_behav$daylight.mins == 0] <- 1440
-multi_behav$forage_mins <- round(multi_behav$prop_forage24 * 24)
-multi_behav$rest_mins <- round(multi_behav$prop_rest24 * 24)
-multi_behav$flight_mins <- round(multi_behav$prop_flight24 * 24)
+## Calculate hours
+multi_behav$forage_hrs <- round(multi_behav$prop_forage24 * 24)
+multi_behav$rest_hrs <- round(multi_behav$prop_rest24 * 24)
+multi_behav$flight_hrs <- round(multi_behav$prop_flight24 * 24)
 
 # Get daily means
 mean(multi_behav$prop_forage.day); sd(multi_behav$prop_forage.day)
@@ -636,54 +621,54 @@ flightProp_glmm <- glmmTMB(prop_flight.day ~ col_lat + (1|year) + (1|ring),
 # save(flightProp_glmm, file = "Data_outputs/flightProp_glmm.RData")
 
 
-## Construct models for rest/flight/forage separately - mins
+## Construct models for rest/flight/forage separately
 
 ## Remove NA values
-multi_behav %<>% filter(!is.na(forage_mins) & !is.na(rest_mins) & !is.na(flight_mins))
+multi_behav %<>% filter(!is.na(forage_hrs) & !is.na(rest_hrs) & !is.na(flight_hrs))
 
 # Fit models
-load("Data_outputs/forageMins_glmm.RData")
-load("Data_outputs/restMins_glmm.RData")
-load("Data_outputs/flightMins_glmm.RData")
+load("Data_outputs/forageHrs_glmm.RData")
+load("Data_outputs/restHrs_glmm.RData")
+load("Data_outputs/flightHrs_glmm.RData")
 
-forageMins_glmm <- glmmTMB(forage_mins ~ col_lat + (1|ring) + (1|year),
+forageHrs_glmm <- glmmTMB(forage_hrs ~ col_lat + (1|ring) + (1|year),
                            data = multi_behav, family = nbinom1)
-forageMins_glmm.null <- glmmTMB(forage_mins ~ 1 + (1|ring) + (1|year),
+forageHrs_glmm.null <- glmmTMB(forage_hrs ~ 1 + (1|ring) + (1|year),
                            data = multi_behav, family = nbinom1)
 
-anova(forageMins_glmm, forageMins_glmm.null)
-summary(forageMins_glmm)
+anova(forageHrs_glmm, forageHrs_glmm.null)
+summary(forageHrs_glmm)
 
-performance::check_overdispersion(forageMins_glmm)
+performance::check_overdispersion(forageHrs_glmm)
 
 
 
-restMins_glmm <- glmmTMB(rest_mins ~ col_lat + (1|ring) + (1|year),
+restHrs_glmm <- glmmTMB(rest_hrs ~ col_lat + (1|ring) + (1|year),
                            data = multi_behav, family = nbinom1)
-restMins_glmm.null <- glmmTMB(rest_mins ~ 1 + (1|ring) + (1|year),
+restHrs_glmm.null <- glmmTMB(rest_hrs ~ 1 + (1|ring) + (1|year),
                                 data = multi_behav, family = nbinom1)
 
-anova(restMins_glmm, restMins_glmm.null)
-summary(restMins_glmm)
+anova(restHrs_glmm, restHrs_glmm.null)
+summary(restHrs_glmm)
 
-performance::check_overdispersion(restMins_glmm)
+performance::check_overdispersion(restHrs_glmm)
 
 
 
-flightMins_glmm <- glmmTMB(flight_mins ~ col_lat + (1|ring) + (1|year),
+flightHrs_glmm <- glmmTMB(flight_hrs ~ col_lat + (1|ring) + (1|year),
                          data = multi_behav, family = nbinom1)
-flightMins_glmm.null <- glmmTMB(flight_mins ~ 1 + (1|ring) + (1|year),
+flightHrs_glmm.null <- glmmTMB(flight_hrs ~ 1 + (1|ring) + (1|year),
                               data = multi_behav, family = nbinom1)
 
-anova(flightMins_glmm, flightMins_glmm.null)
-summary(flightMins_glmm)
+anova(flightHrs_glmm, flightHrs_glmm.null)
+summary(flightHrs_glmm)
 
-performance::check_overdispersion(flightMins_glmm)
+performance::check_overdispersion(flightHrs_glmm)
 
 
-# save(forageMins_glmm, file = "Data_outputs/forageMins_glmm.RData")
-# save(restMins_glmm, file = "Data_outputs/restMins_glmm.RData")
-# save(flightMins_glmm, file = "Data_outputs/flightMins_glmm.RData")
+# save(forageHrs_glmm, file = "Data_outputs/forageHrs_glmm.RData")
+# save(restHrs_glmm, file = "Data_outputs/restHrs_glmm.RData")
+# save(flightHrs_glmm, file = "Data_outputs/flightHrs_glmm.RData")
 
 
 #### Explore results -----------------------------------------------------------
@@ -738,47 +723,47 @@ means_cond_flight$prob[1]*100; means_cond_flight$prob[nrow(means_cond_flight)]*1
 ## Minute effects
 
 # Forage - decrease #
-summary(forageMins_glmm)
-tab_model(forageMins_glmm)
-exp(confint(forageMins_glmm))
-anova(forageMins_glmm, forageMins_glmm.null)
+summary(forageHrs_glmm)
+tab_model(forageHrs_glmm)
+exp(confint(forageHrs_glmm))
+anova(forageHrs_glmm, forageHrs_glmm.null)
 
 # Rest - decrease #
-summary(restMins_glmm)
-tab_model(restMins_glmm)
-exp(confint(restMins_glmm))
-anova(restMins_glmm, restMins_glmm.null)
+summary(restHrs_glmm)
+tab_model(restHrs_glmm)
+exp(confint(restHrs_glmm))
+anova(restHrs_glmm, restHrs_glmm.null)
 
 # Flight - increase #
-summary(flightMins_glmm)
-tab_model(flightMins_glmm)
-exp(confint(flightMins_glmm))
-anova(flightMins_glmm, flightMins_glmm.null)
+summary(flightHrs_glmm)
+tab_model(flightHrs_glmm)
+exp(confint(flightHrs_glmm))
+anova(flightHrs_glmm, flightHrs_glmm.null)
 
 
 ## Get effect sizes for each behaviour
-effects_for.mins <- data.frame(ggeffects::ggpredict(forageMins_glmm, terms = "col_lat")) %>% 
+effects_for.hrs <- data.frame(ggeffects::ggpredict(forageHrs_glmm, terms = "col_lat")) %>% 
   rename(col_lat = x, behaviour = group) %>%
   mutate(behaviour = "forage")
 
-effects_rest.mins <- data.frame(ggeffects::ggpredict(restMins_glmm, terms = "col_lat")) %>% 
+effects_rest.hrs <- data.frame(ggeffects::ggpredict(restHrs_glmm, terms = "col_lat")) %>% 
   rename(col_lat = x, behaviour = group) %>%
   mutate(behaviour = "rest")
 
-effects_flight.mins <- data.frame(ggeffects::ggpredict(flightMins_glmm, terms = "col_lat")) %>% 
+effects_flight.hrs <- data.frame(ggeffects::ggpredict(flightHrs_glmm, terms = "col_lat")) %>% 
   rename(col_lat = x, behaviour = group) %>%
   mutate(behaviour = "flight")
 
 ### Plotting ===================================================================
 
 # Get raw data for plotting
-plot_dat <- multi_behav %>% dplyr::select(c(daylight.mins, col_lat, ring,
+plot_dat <- multi_behav %>% dplyr::select(c(col_lat, ring,
                                             prop_forage.day, prop_rest.day, prop_flight.day,
-                                            forage_mins, rest_mins, flight_mins))
+                                            forage_hrs, rest_hrs, flight_hrs))
 
 ## Set to long format
 ### Proportion
-plot_dat.prop <- melt(plot_dat, id.vars = c("col_lat", "ring", "daylight.mins"),
+plot_dat.prop <- melt(plot_dat, id.vars = c("col_lat", "ring"),
      measure.vars = c("prop_forage.day", "prop_rest.day", "prop_flight.day"),
      variable.name = "behaviour", value.name = "proportion")
 
@@ -790,16 +775,16 @@ plot_dat.prop$behaviour <- level_map[plot_dat.prop$behaviour]
 plot_dat.prop$behaviour <- factor(plot_dat.prop$behaviour, levels = c("forage", "rest", "flight"))
 
 ### Minutes
-plot_dat.mins <- melt(plot_dat, id.vars = c("col_lat", "ring", "daylight.mins"),
-                      measure.vars = c("forage_mins", "rest_mins", "flight_mins"),
+plot_dat.hrs <- melt(plot_dat, id.vars = c("col_lat", "ring"),
+                      measure.vars = c("forage_hrs", "rest_hrs", "flight_hrs"),
                       variable.name = "behaviour", value.name = "hours")
 
-level_map <- c("forage_mins" = "forage",
-               "rest_mins" = "rest",
-               "flight_mins" = "flight")
+level_map <- c("forage_hrs" = "forage",
+               "rest_hrs" = "rest",
+               "flight_hrs" = "flight")
 
-plot_dat.mins$behaviour <- level_map[plot_dat.mins$behaviour]
-plot_dat.mins$behaviour <- factor(plot_dat.mins$behaviour, levels = c("forage", "rest", "flight"))
+plot_dat.hrs$behaviour <- level_map[plot_dat.hrs$behaviour]
+plot_dat.hrs$behaviour <- factor(plot_dat.hrs$behaviour, levels = c("forage", "rest", "flight"))
 
 # Set plotting colours
 forage_col <- "#D81B60"
@@ -859,38 +844,38 @@ proportional_behaviour_plot <- ggplot() +
 #### Plot hour effects ---------------------------------------------------------
 
 ## Get effect sizes for each behaviour
-effects_for.mins <- data.frame(ggeffects::ggpredict(forageMins_glmm, terms = "col_lat")) %>% 
+effects_for.hrs <- data.frame(ggeffects::ggpredict(forageHrs_glmm, terms = "col_lat")) %>% 
   rename(col_lat = x, behaviour = group) %>%
   mutate(behaviour = "forage")
 
-effects_rest.mins <- data.frame(ggeffects::ggpredict(restMins_glmm, terms = "col_lat")) %>% 
+effects_rest.hrs <- data.frame(ggeffects::ggpredict(restHrs_glmm, terms = "col_lat")) %>% 
   rename(col_lat = x, behaviour = group) %>%
   mutate(behaviour = "rest")
 
-effects_flight.mins <- data.frame(ggeffects::ggpredict(flightMins_glmm, terms = "col_lat")) %>% 
+effects_flight.hrs <- data.frame(ggeffects::ggpredict(flightHrs_glmm, terms = "col_lat")) %>% 
   rename(col_lat = x, behaviour = group) %>%
   mutate(behaviour = "flight")
 
 # Bind together
-mins_effects <- rbind(effects_for.mins,
-                      effects_rest.mins,
-                      effects_flight.mins)
+hrs_effects <- rbind(effects_for.hrs,
+                      effects_rest.hrs,
+                      effects_flight.hrs)
 
 
-#save(mins_effects, file = "Data_outputs/rawMins_plotting_data.RData")
-load("Data_outputs/rawMins_plotting_data.RData")
+#save(hrs_effects, file = "Data_outputs/rawHrs_plotting_data.RData")
+load("Data_outputs/rawHrs_plotting_data.RData")
 
 
 ## Build the plot ##
 
-mins_behaviour_plot <- ggplot() + 
+hrs_behaviour_plot <- ggplot() + 
   geom_point(aes(x = col_lat, y = hours, group = behaviour, col = behaviour),
              position = position_jitter(w = 0.5),
-             data = plot_dat.mins[sample(nrow(plot_dat.mins), round(nrow(plot_dat.mins)/100) ),]) +
+             data = plot_dat.hrs[sample(nrow(plot_dat.hrs), round(nrow(plot_dat.hrs)/100) ),]) +
   geom_line(aes(x = col_lat, y = predicted, group = behaviour, col = behaviour), 
-            data = mins_effects) +
+            data = hrs_effects) +
   geom_ribbon(aes(x = col_lat, ymin = conf.low, ymax = conf.high, group = behaviour),
-              data = mins_effects,
+              data = hrs_effects,
               alpha = 0.5, fill = "grey") +
   scale_colour_viridis_d(labels = c("Forage", "Rest", "Flight", "Colony"),
                       name = "Behaviour",
@@ -903,10 +888,10 @@ mins_behaviour_plot <- ggplot() +
 
 
 
-### ~ FIGURE 5 ~ At-sea raw mins behaviours as a function of latitude ==========
+### ~ FIGURE 5 ~ At-sea raw hours behaviours as a function of latitude =========
 
 png("Figures/Figure5_behaviour_by_latitude.png", width = 9, height = 14, units = "in", res = 600)
-ggarrange(proportional_behaviour_plot, mins_behaviour_plot, nrow = 2, align = "hv")
+ggarrange(proportional_behaviour_plot, hrs_behaviour_plot, nrow = 2, align = "hv")
 dev.off()
 
 
@@ -931,20 +916,20 @@ load("Data_outputs/col_gamlss.RData")
 ## Scale colony latitude
 col_behav$col_lat.sc <- scale(col_behav$col_lat)
 
-colMins_glmm <- glmmTMB(col_mins ~ col_lat.sc + (1|ring),
+colHrs_glmm <- glmmTMB(col_hrs ~ col_lat.sc + (1|ring),
                         data = col_behav,
                         family = nbinom1)
-colMins_glmm.null <- glmmTMB(col_mins ~ 1 + (1|ring),
+colHrs_glmm.null <- glmmTMB(col_hrs ~ 1 + (1|ring),
                              data = col_behav,
                              family = nbinom1)
 
 
-#save(colMins_glmm, file = "Data_outputs/col_glmm.RData")
+#save(colHrs_glmm, file = "Data_outputs/col_glmm.RData")
 load("Data_outputs/col_glmm.RData")
 
-summary(colMins_glmm)
-overdisp_fun(colMins_glmm)
-performance::check_overdispersion(colMins_glmm)
+summary(colHrs_glmm)
+overdisp_fun(colHrs_glmm)
+performance::check_overdispersion(colHrs_glmm)
 
 
 
@@ -1065,13 +1050,13 @@ parameters_latitudes$tau_prob <- exp(intercept_tau + beta_collat_tau * parameter
 
 ##### ~ ## Minutes ## ----------------------------------------------------------
 
-colMins_glmm.summary <- summary(colMins_glmm)
-colMins_glmm.conf <- confint(colMins_glmm)
-anova(colMins_glmm, colMins_glmm.null)
+colHrs_glmm.summary <- summary(colHrs_glmm)
+colHrs_glmm.conf <- confint(colHrs_glmm)
+anova(colHrs_glmm, colHrs_glmmnull)
 
 ## Percentage increase for 5 degree change in latitude
-intercept_glmm <- colMins_glmm.summary$coefficients[1]
-beta_collat_glmm <- colMins_glmm.summary$coefficients[2]
+intercept_glmm <- colHrs_glmm.summary$coefficients[1]
+beta_collat_glmm <- colHrs_glmm.summary$coefficients[2]
 
 (((intercept_glmm + beta_collat_glmm*50) - (intercept_glmm + beta_collat_glmm*45)) / 
   (intercept_glmm + beta_collat_glmm*50)) * 100
@@ -1138,38 +1123,36 @@ dev.off()
 #### Plot hour effects ---------------------------------------------------------
 
 # Make predictions
-summary(colMins_glmm)
+summary(colHrs_glmm)
 
-colMins_glmm.unsc <- glmmTMB(col_mins ~ col_lat + (1|ring),
+colHrs_glmm.unsc <- glmmTMB(col_hrs ~ col_lat + (1|ring),
                         data = col_behav,
                         family = nbinom1)
 
-#save(colMins_glmm.unsc, file = "Data_outputs/col_glmm_unsc.RData")
+#save(colHrs_glmm.unsc, file = "Data_outputs/col_glmm_unsc.RData")
 load("Data_outputs/col_glmm_unsc.RData")
 
-colMins_glmm.df <- data.frame(ggeffects::ggpredict(colMins_glmm.unsc, terms = "col_lat")) %>% 
+colHrs_glmm.df <- data.frame(ggeffects::ggpredict(colHrs_glmm.unsc, terms = "col_lat")) %>% 
   dplyr::rename(col_lat = x)
 
 # Build the plot
-colMins_glmm.plot <- ggplot() +
-  geom_boxplot(data = col_behav, aes(x = col_lat, y = col_mins, group = colony),
+colHrs_glmm.plot <- ggplot() +
+  geom_boxplot(data = col_behav, aes(x = col_lat, y = col_hrs, group = colony),
                position = position_dodge(width = 0.5), width = 0.5) +
-  #geom_point(data = col_behav %>% sample_frac(0.1), aes(x = col_lat, y = col_mins)) +
-  geom_ribbon(data = colMins_glmm.df, aes(y = predicted, x = col_lat,
+  geom_ribbon(data = colHrs_glmm.df, aes(y = predicted, x = col_lat,
                                            ymin = conf.low, ymax = conf.high),
               alpha = 0.5, fill = "grey") +
-  geom_line(data = colMins_glmm.df, aes(y = predicted, x = col_lat),
+  geom_line(data = colHrs_glmm.df, aes(y = predicted, x = col_lat),
             linewidth = 1, col = "darkorange") +
   scale_y_continuous(breaks = c(0, 6, 12, 18, 24), limits = c(0, 24)) + 
   labs(y = "Hours spent at colony", x = "Colony latitude (°N)") +
   BLKI_theme
 
 
+#### ~ FIGURE S11 ~ Effects of colony latitude on hours colony attendance ------
 
-#### ~ FIGURE S11 ~ Effects of colony latitude on minutes colony attendance -------
-
-png("Figures/FigureS11_minutes_attendance.png", width = 9, height = 7, units = "in", res = 600)
-colMins_glmm.plot
+png("Figures/FigureS11_hours_attendance.png", width = 9, height = 7, units = "in", res = 600)
+colHrs_glmm.plot
 dev.off()
 
 

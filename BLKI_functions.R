@@ -200,46 +200,6 @@ att_by_hour <- function(dataset) {
 }
 
 
-# # RANDOMISE GLS DATA ------------------------------------------------------
-# randomise_GLS <- function(ring, starts, durs) {
-#   
-#   require(lubridate)
-#   
-#   # Set output length
-#   output_length <- length(starts)
-#   
-#   # Randomise hour of first start time 
-#   stt_time <- as.POSIXct(starts[1], format = "%Y-%m-%d %H:%M:%S")
-#   hour(stt_time) <- sample(0:23, 1)
-#   r_durs <- abs(rnorm(output_length, mean = mean(durs), sd = sd(durs)))
-#   r_starts <- c(stt_time, rep(NA, (output_length-1)))
-#   r_locs <- rep_len(c("colony", "trip"), length.out = output_length)
-#   
-#   r_data <- data.frame(start = as.POSIXct(r_starts, 
-#                                           format = "%Y-%m-%d %H:%M:%S"),
-#                        loc = r_locs,
-#                        end = NA,
-#                        duration_mins = r_durs)
-#   
-#   # Create randomised trips
-#   for (i in 1:nrow(r_data)) {
-#     
-#     r_data$end[i] <- as.character(r_data$start[i] + (r_data$duration_mins[i]*60))
-#     
-#     if(i + 1 > nrow(r_data)) next 
-#     
-#     r_data$start[i+1] <- r_data$end[i]
-#     
-#   }
-#   
-#   r_data$ring <- ring
-#   r_data <- r_data[,c(5,1,2,3,4)]
-#   
-#   r_data
-# }
-# 
-
-
 # FIND TRIP DURATION FROM PROCESSED IMMERSION DATA ------------------------
 
 # For troubleshooting
@@ -360,12 +320,6 @@ BLKI_theme <- theme_bw() + theme(axis.text.x = element_text(size = 12),
                     axis.title.y = element_text(size = 14),
                     plot.tag = element_text(size = 15),
                     plot.title = element_text(size = 16, face = "bold"))
-# 
-# # FIND TRIP STARTS AND ENDS FROM GLS -----------------------------------------------------
-# 
-# tripfinder <- function(x) {sum(runs$lengths[1:(x - 1)])} 
-# endfinder <- function(x) {sum(runs$lengths[1:(x)])}
-
 
 
 # ## TASH'S HACKY DATE TIME FORMATTER -------------------------------------
@@ -409,6 +363,15 @@ time_sorter <- function(x){
 
 
 
+# OVERDISPERSION FUNCTION (Ben Bolker) -----------------------------------------
 
+overdisp_fun <- function(model) {
+  rdf <- df.residual(model)
+  rp <- residuals(model,type="pearson")
+  Pearson.chisq <- sum(rp^2)
+  prat <- Pearson.chisq/rdf
+  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
+  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
+}
 
 

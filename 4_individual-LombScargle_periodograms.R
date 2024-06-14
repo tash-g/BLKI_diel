@@ -1,6 +1,6 @@
 ## ---------------------------
 ##
-## Script name: 5_individual-LombScargle_periodograms.R
+## Script name: 4_individual-LombScargle_periodograms.R
 ##
 ## Purpose of script: Analyse nest visitation using attendance datasets
 ##
@@ -57,9 +57,6 @@ median_ci.func <- function (values) {
 # Periodogram analysis ---------------------------------------------------------
 # Makes empty dataframe to be filled within loop
 DF_lsp <- data.frame(ID = as.character(), 
-			# month and year maybe not relevant for all analyses, but another variable to group results by if relevant
-                     #Month_Year = as.character(),
-                     #Month = as.character(),
                      Period = as.numeric(),
                      PNmax = as.numeric(),
                      P_value = as.numeric())
@@ -202,7 +199,7 @@ plot.signif <- ggplot() +
   BLKI_theme
 
 
-### ~ FIGURE SX ~ Prop significant ~ col lat -----------------------------------
+### ~ FIGURE S5 ~ Prop significant ~ col lat -----------------------------------
 
 png(file = "Figures/FigureS5_prop_signif.png", width = 9, height = 7, units = "in", res = 600)
 plot.signif
@@ -276,7 +273,7 @@ median_plot <- ggplot(LSP_Results_All.signif, aes(x = col_lat, y = Period_median
   scale_y_continuous(breaks = seq(25, 45, by = 5)) +
   BLKI_theme
 
-### ~ FIGURE 2 ~ Ridgeplot - all periods ---------------------------------------
+### ~ FIGURE 2 ~ Ridgeplot - significant periods ---------------------------------------
 png(file = "Figures/Figure2_median_period.png", width = 21, height = 9, units = "in", res = 600)
 ggpubr::ggarrange(median_plot, period_ridges.signif, nrow = 1,
                   widths = c(0.8, 1))
