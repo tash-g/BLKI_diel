@@ -2,7 +2,7 @@
 Natasha Gillies, Sébastien Descamps, Nicholas P. Huffeldt, Frederick McKendrick, Tycho Anker-Nilssen, Maria Bogdanova, Vegard Sandøy Bråthen, Olivier Chastel, Signe Christensen-Dalsgaard, Francis Daunt, Nina Dehnhard, Alexey Viktorovich Ezhov, Annette Fayet, Morten Frederiksen, Maria Gavrilo, April Hedd, Yann Kolbeinsson, Yuri Vladimirovich Krasnov, Aili Labansen, Jannie Linnebjerg, Svein-Håkon Lorentsen, Flemming R. Merkel, Børge Moe, Mark Newell, Stephen Newton, Bergur Olsen, Tone Reiertsen, Greg Robertson, Hallvard Strøm, Thorkell Lindberg Thorarinsson, Samantha C. Patrick
 
 ## Overview
-This repository contains scripts and data to recreate the main results and figures of this paper (currently in prep). 
+This repository contains scripts and data to recreate the main results and figures of this paper (currently in submission). 
 
 ## Scripts
 A short description of each script is given below. Note that the raw geolocator/salt-water immersion data are provided by the [SEATRACK](https://seapop.no/en/seatrack/) project and so are not shared here. Those interested in using these data should contact the authors/SEATRACK for further information.
