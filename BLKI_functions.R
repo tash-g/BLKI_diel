@@ -20,73 +20,6 @@ gcd.hf <- function(long1, lat1, long2, lat2) {
   return(d) # Distance in km
 }
 
-# INTERPOLATE  ----------------------------------------------------
-
-interpolate_gps <- function(lat, lon, datetime, int) {
-  
-  require(geosphere); require(pracma)
-  
-  df <- data.frame(cbind(as.character(datetime), lon, lat))
-  colnames(df)[1] <- "datetime"
-  df$datetime <- as.POSIXct(df$datetime, format = "%Y-%m-%d %H:%M:%S")
-  df[,2:3] <- lapply(df[,2:3], as.numeric)
-  
-  ## Resample GPS to exact fixes
-  df$x1 <-  c(abs(df$lon[1:(nrow(df)-1)]-df$lon[2:(nrow(df))]),1)
-  df$x2 <-  c(abs(df$lat[1:(nrow(df)-1)]-df$lat[2:(nrow(df))]),1)
-  df$x3 <- c(as.numeric(df$datetime)[1:(length(as.numeric(df$datetime))-1)]- as.numeric(df$datetime)[2:(length(as.numeric(df$datetime)))],-1)
-  df <- df[which(df$x1 != 0 & df$x2 != 0 & df$x3 < 0),]
-  
-  df$distance_next_metres <- c(0,distHaversine(data.frame(df$lon[1:(nrow(df)-1)],
-                                                          df$lat[1:(nrow(df)-1)]),
-                                               data.frame(df$lon[2:(nrow(df))],
-                                                          df$lat[2:(nrow(df))]))) 
-  
-  df$cumdist <- cumsum(df$distance_next_metres)
-  df <- df[order(df$datetime),]
-  
-  nrt <- nrow(df)
-  idt <- seq(from=df$datetime[1], to=df$datetime[nrt], by=int)
-  ix = pchip(as.numeric(df$datetime), df$lon, as.numeric(idt))
-  iy = pchip(as.numeric(df$datetime), df$lat, as.numeric(idt))
-  icumdist = pchip(as.numeric(df$datetime), df$cumdist, as.numeric(idt))
-  
-  df <- data.frame(datetime = idt,
-                   Longitude = ix,
-                   Latitude = iy)
-  
-  return(df)
-  
-}
-
-
-# CALC_TEST_STATISTICS ----------------------------------------------------
-
-calc_test_statistics <- function(coefs, vcovs, b_pos1, b_pos2, conf.level = NULL) {
-  
-  if (is.null(conf.level)) {
-    critical_value <- qnorm((1 + 0.95) / 2) } else {
-      critical_value <- qnorm((1 + conf.level) / 2)
-    }
-  
-  beta <- coefs[b_pos1,1] + coefs[b_pos2,1]
-  se <- sqrt(coefs[b_pos1,2]^2 + cond_coefs[b_pos2,2]^2 + 2*cond_vcov[b_pos1,b_pos2]) 
-  upper_conf <- beta + (critical_value * se)
-  lower_conf <- beta - (critical_value * se)
-  z_score <- beta / se
-  p_value <- 2 * (1 - pnorm(abs(z_score)))
-  
-  print(data.frame(cbind(beta, se, lower_conf, upper_conf, z_score, p_value))[1,])
-  
-}
-
-# LOGIT2PROB FUNCTION -----------------------------------------------------
-
-logit2prob <- function(logit){
-  odds <- exp(logit)
-  prob <- odds / (1 + odds)
-  return(prob)
-}
 
 # SAMPLE INDIVIDUAL DATA BY TIME PERIOD -----------------------------------
 
@@ -129,86 +62,8 @@ subsample_by_hours <- function(data, sample_time) {
 }
 
 
-# GET DECIMAL FLOOR AND CEILING -------------------------------------------
-
-# From : https://stackoverflow.com/questions/35807523/r-decimal-ceiling
-
-floor_dec <- function(x, level=1) round(x - 5*10^(-level-1), level)
-ceiling_dec <- function(x, level=1) round(x + 5*10^(-level-1), level)
-
-
-# FIND ATTENDANCE BY HOUR -------------------------------------------------
-
-## This is a clunky function but serves to streamline the randomisation analysis
-
-att_by_hour <- function(dataset) {
-  
-  # Time spent at colony
-  kits.att <- dataset %>% 
-    group_by(ring, loc) %>%
-    mutate(time = purrr::map2(start_time, end_time, seq, by = 'min')) %>%
-    tidyr::unnest(time) %>%
-    mutate(hour = hour(time), date = as.Date(time)) %>%
-    dplyr::count(date, hour) %>% 
-    mutate(datetime = paste(date, 
-                            format(strptime(hour, format = "%H"), "%H:%M:%S"))) %>%
-    data.frame()
-
-  kits.att <- kits.att[order(kits.att$ring, kits.att$datetime),]
-
-  # Set trip attendance values to inverse
-  kits.att$n[kits.att$loc == "trip"] <- 60 - kits.att$n[kits.att$loc == "trip"]
-
-  # Where duplicates, remove the trip value
-  kits.att <-  kits.att[order(kits.att$ring, kits.att$datetime),]
-  kits.att <- kits.att[!duplicated(kits.att[c("ring","datetime")]),]
-
-  # Remove loc column - no longer needed
-  kits.att$loc <- NULL
-
-  # Convert date and hour column to posixct
-  kits.att$datetime <- as.POSIXct(kits.att$datetime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
-
-  ## Extend hours column to include missing hours ----------------------------
-  kits.att <- kits.att %>%
-    group_by(ring) %>%
-    tidyr::complete(datetime = seq(min(datetime), max(datetime), by = 'hour'), fill = list(n = 0)) %>%
-    tidyr::fill(ring) %>%
-    data.frame()
-
-  # Give each timestamp an ID per bird; rename 'n' column 
-  kits.att <- kits.att %>%
-    group_by(ring) %>%
-    mutate(time_ID = row_number()) %>%
-    rename(att_time = n) %>%
-    data.frame()
-
-  # Add columns representing total possible attendance minutes
-  kits.att$att_poss <- 60
-
-  # Find proportional attendance at colony
-  kits.att$prop_att <- kits.att$att_time/kits.att$att_poss
-  
-  # Ensure birds have at least 60 hours of data (lag time used for analysis)
-  kits.att <- kits.att %>% 
-    group_by(ring) %>% 
-    filter(n_distinct(datetime) > 60)
-  
-  # Output dataset
-  kits.att
-
-}
-
 
 # FIND TRIP DURATION FROM PROCESSED IMMERSION DATA ------------------------
-
-# For troubleshooting
-# mydf <- mydf
-# rolling.immersion <- mydf$rolling.percentage
-# datetime <- mydf$datetime
-# immersion <- mydf$immersion
-# thresh <- thresh.immersion
-
 
 tripFinder <- function(datetime, immersion, rolling.immersion, thresh) {
   
@@ -229,7 +84,7 @@ tripFinder <- function(datetime, immersion, rolling.immersion, thresh) {
         r <- r - 1 }  
       
       # Bug in R means POSIXct at midnight excludes time component
-      posix.startDate <- format(as.POSIXct(datetime[r], tz="UTC"), format="%Y-%m-%d %H:%M:%S")
+      posix.startDate <- format(as.POSIXct(datetime[r]), format="%Y-%m-%d %H:%M:%S", tz = "UTC")
       
       stts[i] <- as.character(posix.startDate) #  Label start of trip
       
@@ -249,7 +104,7 @@ tripFinder <- function(datetime, immersion, rolling.immersion, thresh) {
       r <- r + 1  # Add 10 min commuting time penalty for return 
       
       # Bug in R means POSIXct at midnight excludes time component
-      posix.endDate <- format(as.POSIXct(datetime[r], tz="UTC"), format="%Y-%m-%d %H:%M:%S")
+      posix.endDate <- format(as.POSIXct(datetime[r]), format="%Y-%m-%d %H:%M:%S", tz = "UTC")
       
       ends[i] <- as.character(posix.endDate) # Set end time 
       
@@ -362,16 +217,55 @@ time_sorter <- function(x){
 
 
 
+# REMOVE LONG ZERO RUNS ---------------------------------------------------
 
-# OVERDISPERSION FUNCTION (Ben Bolker) -----------------------------------------
+# These represent pre- or post-recording intervals
 
-overdisp_fun <- function(model) {
-  rdf <- df.residual(model)
-  rp <- residuals(model,type="pearson")
-  Pearson.chisq <- sum(rp^2)
-  prat <- Pearson.chisq/rdf
-  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
-  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
+rm_non_recording <- function(df, threshold_hours = 48) {
+  
+  # Calculate number of rows corresponding to threshold_hours
+  threshold_rows <- threshold_hours * 60 / 10
+  
+  df %<>% 
+    arrange(datetime) %>%
+    mutate(zero_flag = (immersion == 0),
+           zero_group = cumsum(zero_flag != lag(zero_flag, default = FALSE)) ) %>%
+    group_by(zero_group) %>%
+    mutate(run_length = n()) 
+
+  last_group <- df$zero_group[nrow(df)]
+  
+  # Filter logic: remove rows if they are in start or end zero run and exceed threshold
+  df_filtered <- df %>%
+    filter(!( (zero_group == 1 | zero_group == last_group)
+      & run_length > threshold_rows ) ) %>%
+    ungroup() %>%
+    select(-zero_flag, -zero_group, -run_length)
+  
+  return(df_filtered)
+
+  }
+
+
+
+
+# GET PEAK STRENGTH -------------------------------------------------------
+
+
+get_peak_strength <- function(df) {
+  
+  # restrict to lags > 1 (exclude lag 1 autocorrelation of 1.0)
+  df_use <- df %>% filter(Lag > 1)
+  
+  # Find first peak after lag 1 (maximum ACF)
+  peak_lag <- df_use$Lag[which.max(df_use$ACF)]
+  peak_val <- max(df_use$ACF)
+  
+  # Get first trough after the peak
+  df_after_peak <- df_use %>% filter(Lag > peak_lag)
+  if (nrow(df_after_peak) == 0) return(NA)
+  trough_val <- min(df_after_peak$ACF)
+  
+  # Peak strength = peak - trough
+  return(peak_val - trough_val)
 }
-
-
