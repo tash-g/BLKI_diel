@@ -1,0 +1,314 @@
+---
+title: "Data processing for: Evidence for latitude-driven changes in diel rhythms in a wide-ranging seabird"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+# Define the packages
+packages <- c("ggplot2", "cowplot", "zoo", "dplyr", "lubridate", "suncalc",
+              "lutz", "data.table", "magrittr", "tidyr", "purrr", "tidyr")
+
+# Install packages not yet installed - change lib to library path
+# installed_packages <- packages %in% rownames(installed.packages())
+# 
+# if (any(installed_packages == FALSE)) {
+#  install.packages(packages[!installed_packages])
+# }
+
+# Load packages
+invisible(lapply(packages, library, character.only = TRUE))
+
+# Suppress dplyr summarise warning
+options(dplyr.summarise.inform = FALSE)
+
+# Use dplyr select
+select <- dplyr::select
+
+source("BLKI_functions.R")
+
+
+# Session info -----
+
+# > sessionInfo()
+# R version 4.5.0 (2025-04-11 ucrt)
+# Platform: x86_64-w64-mingw32/x64
+# Running under: Windows 11 x64 (build 26100)
+# 
+# Matrix products: default
+#   LAPACK version 3.12.1
+# 
+# locale:
+# [1] LC_COLLATE=English_United Kingdom.utf8  LC_CTYPE=English_United Kingdom.utf8    LC_MONETARY=English_United Kingdom.utf8
+# [4] LC_NUMERIC=C                            LC_TIME=English_United Kingdom.utf8    
+# 
+# time zone: Europe/London
+# tzcode source: internal
+# 
+# attached base packages:
+# [1] stats     graphics  grDevices utils     datasets  methods   base     
+# 
+# other attached packages:
+# [1] lubridate_1.9.4 dplyr_1.1.4     zoo_1.8-14      cowplot_1.1.3   ggplot2_3.5.2  
+# 
+# loaded via a namespace (and not attached):
+#  [1] vctrs_0.6.5        cli_3.6.5          knitr_1.50         rlang_1.1.6        xfun_0.52          generics_0.1.4    
+#  [7] glue_1.8.0         htmltools_0.5.8.1  rmarkdown_2.29     scales_1.4.0       grid_4.5.0         evaluate_1.0.3    
+# [13] tibble_3.3.0       fastmap_1.2.0      yaml_2.3.10        lifecycle_1.0.4    compiler_4.5.0     RColorBrewer_1.1-3
+# [19] Rcpp_1.0.14        timechange_0.3.0   pkgconfig_2.0.3    rstudioapi_0.17.1  digest_0.6.37      farver_2.1.2      
+# [25] lattice_0.22-6     R6_2.6.1           tidyselect_1.2.1   pillar_1.10.2      magrittr_2.0.3     Matrix_1.7-3      
+# [31] withr_3.0.2        tools_4.5.0        gtable_0.3.6      
+
+```
+
+This script separates trips to sea from colony time in the GLS datasets, using the previously established identification parameters (see SI_validate_trips).
+
+This file is designed to work with the original immersion datasets and the non-anonymised metadata, which are available by request from SEATRACK. As a result it will not run 'out of the box' with the rest of the scripts, and is thus included here only for review and context.
+
+```{r extra_trips_from_gls}
+
+# Set parameters for trip identification
+rolling.width <- 20
+thresh.immersion <- 5 #15
+
+# Load datasets
+## Huge amount of data - so loop through previously subsetted files individually
+
+# Load metadata file
+load("Data_workshop/BLKI_metadata.RData")
+
+# Identify relevant files 
+gls_files <- list.files("Data_workshop/GLS Processed")[grepl("GLS",list.files("Data_workshop/GLS Processed"))]
+
+# Loop through each file
+gls_hourly_behaviour.list <- vector(mod = "list", length = length(gls_files))
+
+for (i in 1:length(gls_files)) {
+  
+  pb <- txtProgressBar(min = 0, max = length(gls_files), style = 3)
+  setTxtProgressBar(pb, i)
+
+  ## FILE LOOP - LOAD FILES ---------------------------------------------------
+  
+  load(paste0("Data_workshop/GLS Processed/", gls_files[i]))
+  
+  # Make date a posixct variable
+  gls$datetime <- as.POSIXct(gls$datetime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
+ 
+  # Merge metadata
+  gls <- merge(gls, meta, by = "ring", all.x = TRUE)
+  
+  # Subset to breeding period
+  gls %<>% mutate(year = year(datetime),
+                  min_subset_date = as.Date(paste0(year, "-", min_subset)),
+                  max_subset_date = as.Date(paste0(year, "-", max_subset)),
+                 ringYr = paste(ring, year, sep = "_")) %>%
+    filter(as.Date(datetime) >= min_subset_date & as.Date(datetime) <= max_subset_date) %>%
+    select(-c(min_lay, min_subset, max_subset, min_subset_date, max_subset_date, year))
+  
+  ## Calculate rolling mean and add threshold immersion parameters
+  glsDat <- gls %>%
+    group_by(ringYr) %>%
+    # Get rolling immersion for each bird
+    mutate(
+      immersion.rolling = rollmean(immersion, rolling.width, na.pad = T),
+      rolling.percentage = immersion.rolling / max(immersion.rolling, na.rm = T) * 100
+    ) %>%
+    data.frame()
+  
+  ## Set NA rolling immersion to 0 so function will work
+  glsDat$rolling.percentage[is.na(glsDat$rolling.percentage)] <- 0
+  
+  ## BEHAVIOUR LOOP - IDENTIFY COLONY ATTENDANCE & ACTIVITY -------------------
+  
+  myKits <- unique(glsDat$ringYr)
+  hourlyList <- vector(mode = "list", length = length(myKits))
+
+  for (k in 1:length(myKits)) {
+    
+    mydf <- subset(glsDat, ringYr == myKits[k])
+    mydf <- mydf[order(mydf$datetime),]
+    
+    # Add second to datetime to deal with midnight error
+    mydf$datetime <- mydf$datetime + 1
+    
+    #### Identify trips --------------------------------------------------------
+    
+    ## Catch GLS that didn't go out/have errors
+    if (sum(mydf$immersion) < 5) next
+
+    ## Filter non-recording periods
+    mydf <- rm_non_recording(mydf)
+    
+    # Find trips
+    tripsID <- tripFinder(mydf$datetime,
+                          mydf$immersion,
+                          mydf$rolling.percentage,
+                          thresh.immersion)
+
+    mytrips <- data.frame(ring = mydf$ring[1],
+                          type = "GLS",
+                          start = tripsID[,1],
+                          loc = "trip",
+                          end = tripsID[,2])
+
+    ## Error if no end to trip
+    mytrips <- subset(mytrips, !is.na(end))
+
+    ## Combine trips with short gaps between them
+    mytrips$tripGap <- difftime(lead(mytrips$start), mytrips$end, units = "mins")
+    mytrips$end[as.numeric(mytrips$tripGap) <= 20] <- NA
+    mytrips$end <- na.locf(mytrips$end, fromLast = TRUE)
+    mytrips <- subset(mytrips, !duplicated(end))
+    mytrips$tripGap <- NULL
+
+    ## Add in colony rows
+    myvisits <- data.frame(ring = mydf$ring[1],
+                           type = "GLS",
+                           start = c(mydf$datetime[1], mytrips$end),
+                           loc = "colony",
+                           end = c(mytrips$start, as.character(mydf$datetime[nrow(mydf)])))
+
+    myvisits$start <- as.character(myvisits$start)
+
+    # Combine datasets
+    mytrips <- rbind(mytrips, myvisits)
+    mytrips$start <- fasttime::fastPOSIXct(mytrips$start, tz = "UTC")
+    mytrips$end <- fasttime::fastPOSIXct(mytrips$end, tz = "UTC")
+    mytrips <- mytrips[order(mytrips$start),]
+    mytrips$duration_mins <- difftime(mytrips$end, mytrips$start,
+                                      units = "mins")
+    mytrips <- subset(mytrips, as.numeric(duration_mins) > 0)
+
+    ## Add metadata
+    mymeta <- mydf %>% dplyr::select(c(ring, colony, col_lat, col_lon)) %>% distinct(.keep_all = TRUE)
+    mytrips <- merge(mytrips, mymeta, by = "ring", all.x = TRUE)
+
+    ## Remove additional second
+    mytrips$start <- mytrips$start - 1
+    mytrips$end <-mytrips$end - 1
+    
+  
+    ## Identify hourly behaviour ----------------------------------------------
+    
+    # Force trips to start 1 min after end of last one
+    mytrips$start <- mytrips$start + 60
+    
+    # Get attendance per hour #
+    att.df <- mytrips %>% 
+      group_by(ring, loc, colony, col_lat, col_lon) %>%
+      mutate(time = purrr::map2(start, end, seq, by = 'min')) %>%
+      tidyr::unnest(time) %>%
+      mutate(hour = hour(time), date = as.Date(time)) %>%
+      dplyr::count(date, hour) %>% 
+      mutate(datetime = as.POSIXct(paste(date, format(strptime(hour, format = "%H"), "%H:%M:%S", tz = "UTC")))) %>%
+      data.frame() %>%
+      rename(mins_att = n) %>%
+      arrange(datetime) %>%
+      mutate(year = year(datetime))
+    
+    total.dur <- mytrips %>% 
+      distinct() %>%
+      mutate(time = map2(start, end, seq, by = "min")) %>%
+      tidyr::unnest(time) %>%
+      mutate(date = as.Date(time),
+             hour = hour(time)) %>%
+      mutate(datetime = as.POSIXct(paste(date, sprintf("%02d:00:00", hour)), tz = "UTC")) %>%
+      group_by(date, hour) %>%
+      summarise(total_duration = n(), .groups = "drop")
+    
+    ## Set trip attendance values to inverse
+    att.df$mins_att[att.df$loc == "trip"] <- 60 - att.df$mins_att[att.df$loc == "trip"]
+    
+    ## Where duplicates, remove the trip value
+    att.df <- att.df[!duplicated(att.df[c("ring","datetime")]),]
+    
+    ## Calculate proportional attendance
+    att.df <- merge(att.df, total.dur, by = c("date", "hour"), all.x = T)
+    att.df %<>% mutate(prop_att = mins_att / total_duration) %>% arrange(datetime)
+    
+    
+    # Get activity per hour #
+    mydf$hour <- format(mydf$datetime, "%H")
+    mydf$date <- as.Date(mydf$datetime)
+    
+    hourly_behaviour <- mydf %>% 
+      group_by(colony, ring, date, hour, col_lat, col_lon) %>%
+      dplyr::summarise(imm.total = sum(immersion),
+                       flight.mins = length(behaviour[behaviour == "flight"])*10,
+                       rest.mins = length(behaviour[behaviour == "rest"])*10,
+                       forage.mins = length(behaviour[behaviour == "foraging"])*10,
+                       activity.mins = flight.mins + forage.mins,
+                       bout_dur.mins = n() * 10) %>%
+      mutate(datetime = as.POSIXct(paste0(date, " ", hour, ":00:00"), format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
+             hour = as.numeric(hour)) %>%
+      arrange(datetime) %>%
+      data.frame()
+    
+    ## Merge with attendance
+    hourly_behaviour <- merge(hourly_behaviour, att.df %>% select(c(date, hour, prop_att)),
+                              by = c("date", "hour"), all.x = T)
+    
+    hourly_behaviour %<>%
+      mutate(activity.mins = round(activity.mins - 60*prop_att),
+             activity.mins = ifelse(activity.mins < 0, 0, activity.mins),
+             activity.mins = round(activity.mins/ 10) * 10)
+    
+    # Get sun elevation
+  
+    ## Convert time to local
+    timezone <- tz_lookup_coords(mydf$col_lat[1], mydf$col_lon[1], warn = FALSE)
+    
+    hourly_behaviour %<>%
+      dplyr::rename(hour_UTC = hour, datetime_UTC = datetime) %>%
+      mutate(datetime = datetime_UTC + 1,
+             datetime = as.POSIXct(datetime, tz = timezone),
+             hour = hour(datetime))
+    
+    ## Calculate sun elevation for local time
+    hourly_behaviour %<>%
+      mutate(sun_altitude = getSunlightPosition(date = datetime, 
+                                                col_lat[1], col_lon[1])[,4],
+             sun_altitude = rad2deg(sun_altitude),
+             year = year(datetime)) 
+    
+    ## Clean up dataset ---------------------------------------------------------
+
+    # Ensure birds have at least 60 hours of data (lag time used for analysis)
+    if(nrow(hourly_behaviour) < 60) next 
+    
+    hourly_behaviour %<>% 
+      arrange(datetime) %>% 
+      mutate(datetime = datetime - 1) %>%
+      relocate(c(colony, year, ring, col_lat, col_lon, datetime, date, hour), .before = imm.total) %>%
+      relocate(c(sun_altitude, datetime_UTC, hour_UTC), .after = prop_att) %>%
+      select(-c(flight.mins, rest.mins, forage.mins))
+    
+    hourlyList[[k]] <- hourly_behaviour
+    
+  }
+  
+  hourBehaviour <- do.call("rbind", hourlyList)
+  
+  gls_hourly_behaviour.list[[i]] <- hourBehaviour
+  
+}
+
+close(pb)
+
+gls_hourly <- data.table::rbindlist(gls_hourly_behaviour.list)
+
+# Output the data
+
+write.csv(gls_hourly, 
+     file = "Data_inputs/BLKI_gls-hourly-behaviour.RData", 
+     row.names = F)
+
+```
+

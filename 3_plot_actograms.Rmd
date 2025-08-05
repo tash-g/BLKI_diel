@@ -1,0 +1,310 @@
+---
+title: "Actogram plots for: Evidence for latitude-driven changes in diel rhythms in a wide-ranging seabird"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Set-up 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+# Define the packages
+packages <- c("tidyverse", "lubridate", "cowplot", "viridis", "stringr", "magrittr")
+
+# Install packages not yet installed - change lib to library path
+# installed_packages <- packages %in% rownames(installed.packages())
+# 
+# if (any(installed_packages == FALSE)) {
+#  install.packages(packages[!installed_packages])
+# }
+
+# Load packages and functions
+invisible(lapply(packages, library, character.only = TRUE))
+
+# Function to get day and month with dummy year
+as_day_month <- function(x) {
+  as.Date(paste0("2000-", x), format = "%Y-%d-%m") }
+
+rename = dplyr::rename
+select = dplyr::select
+
+# Create folder to store actograms if doesn't already exist
+actograms.path <- "./Figures/Actograms/"
+
+# if(dir.exists(out.path) == FALSE) {
+#   dir.create(out.path)
+# }
+
+# Session info ----
+
+# > sessionInfo()
+# R version 4.5.0 (2025-04-11 ucrt)
+# Platform: x86_64-w64-mingw32/x64
+# Running under: Windows 11 x64 (build 26100)
+# 
+# Matrix products: default
+#   LAPACK version 3.12.1
+# 
+# locale:
+# [1] LC_COLLATE=English_United Kingdom.utf8  LC_CTYPE=English_United Kingdom.utf8    LC_MONETARY=English_United Kingdom.utf8
+# [4] LC_NUMERIC=C                            LC_TIME=English_United Kingdom.utf8    
+# 
+# time zone: Europe/London
+# tzcode source: internal
+# 
+# attached base packages:
+# [1] stats     graphics  grDevices utils     datasets  methods   base     
+# 
+# other attached packages:
+#  [1] magrittr_2.0.3    viridis_0.6.5     viridisLite_0.4.2 cowplot_1.1.3     lubridate_1.9.4   forcats_1.0.0     stringr_1.5.1    
+#  [8] dplyr_1.1.4       purrr_1.0.4       readr_2.1.5       tidyr_1.3.1       tibble_3.3.0      ggplot2_3.5.2     tidyverse_2.0.0  
+# 
+# loaded via a namespace (and not attached):
+#  [1] Matrix_1.7-3       gtable_0.3.6       compiler_4.5.0     tidyselect_1.2.1   Rcpp_1.0.14        gridExtra_2.3     
+#  [7] scales_1.4.0       yaml_2.3.10        fastmap_1.2.0      lattice_0.22-6     R6_2.6.1           generics_0.1.4    
+# [13] knitr_1.50         pillar_1.10.2      RColorBrewer_1.1-3 tzdb_0.5.0         rlang_1.1.6        stringi_1.8.7     
+# [19] xfun_0.52          timechange_0.3.0   cli_3.6.5          withr_3.0.2        digest_0.6.37      grid_4.5.0        
+# [25] rstudioapi_0.17.1  hms_1.1.3          lifecycle_1.0.4    vctrs_0.6.5        evaluate_1.0.3     glue_1.8.0        
+# [31] farver_2.1.2       rmarkdown_2.29     tools_4.5.0        pkgconfig_2.0.3    htmltools_0.5.8.1 
+```
+
+# Load data and create plotting dataframes
+
+```{r load_and_process_data }
+
+# Load data ---- 
+
+load("Data_inputs/BLKI_gls-hourly-behaviour.RData")
+breeding_dates <- read.csv("Data_inputs/BLKI_breeding_dates.csv")
+
+gls_hourly %<>% select(ring, date, hour, activity.mins, colony, col_lat) %>%
+  mutate(ringYr = paste0(ring, "_", year(date))) %>% arrange(ring, date, hour)
+
+
+# Create dataframes ----
+
+# Create acc_List
+ACC_LIST <- split(gls_hourly, f = gls_hourly$ringYr)
+
+## names each list with the ID
+names(ACC_LIST) <- sapply(ACC_LIST, function(x) x$ringYr[1])
+T_names <- names(ACC_LIST)
+Acto_list <- list()
+
+for(i in 1:length(ACC_LIST)){
+  startdt <- as.POSIXct(ACC_LIST[[i]]$date[1], tz="UTC") #define the first date to use data from
+  df.a <- ACC_LIST[[i]] %>% 
+    filter(date > startdt)
+  df.a$Date2 <- as.Date(df.a$date)
+  df.a$hour <- as.numeric(df.a$hour)
+
+  df.b <- ACC_LIST[[i]] %>% 
+    filter(date > startdt)
+  df.b$Date2 <- as.Date(df.b$date) -1
+  df.b$hour <- as.numeric(df.b$hour) + 24
+  
+  df.c <- rbind(df.a, df.b)
+  df.c$mean.act <- df.c$activity/12
+  df.c$Rday <- as.numeric(as.Date(df.c$Date2) - as.Date(startdt)-1 + (yday(startdt)+1))
+  
+
+  x <- list(df.c)
+  DF_name <- names(ACC_LIST[i])
+  names(x) <- DF_name
+  Acto_list <- append(Acto_list, x)
+
+}  
+
+```
+
+# Plot all birds in the dataset (separate files for each)
+
+```{r plot_all_birds }
+
+acto_name.list <- vector(mode = "list", length = length(Acto_list))
+
+for(i in 1:length(Acto_list)){
+  
+  df.c <- Acto_list[[i]] 
+  df.c <- as.data.frame(df.c)
+  rownames(df.c) <- NULL
+  
+  df.c %<>% arrange(date, hour)
+  
+  # Get breeding dates; filter for breeding and any prolonged zero activity periods (not tracking)
+  mydates <- subset(breeding_dates, colony == df.c$colony[1]) 
+  lower <- as_day_month(format(mydates$min_subset, "%d-%m"))
+  upper <- as_day_month(format(mydates$max_subset, "%d-%m"))
+  
+  df.c %<>% 
+    mutate(day_month = as_day_month(format(date, "%d-%m"))) %>%
+    filter(day_month >= lower & day_month <= upper)
+  
+  df.c$Rdayc <- as.factor(df.c$Rday)
+  df.c$month <- format(df.c$date,"%m")
+  
+
+  ## Set date breaks
+  unique_dates <- unique(df.c$date)
+  
+  if (length(unique_dates) > 15) {
+    indices <- seq(1, length(unique_dates), by = 7)
+    breaks_y <- unique(df.c$Rdayc)[indices]
+    labels_y <- unique(df.c$date)[indices]
+  } else next 
+  
+  # Make plot
+  actogram_p <- ggplot() +
+    geom_tile(aes(x = hour, y = Rdayc, fill = mean.act), data=df.c) + # colors tiles based on (mean) hourly activity. Must make column for hourly activity before running script
+    scale_fill_gradientn(colours = c("white", "#009688", "#00796B", "#004d40", "black")) +
+    geom_tile(data = df.c[is.na(df.c$Activity_NAs),], aes(x = hour, y = Rdayc), fill = "firebrick3", group = 1)  + #  colors NAs red
+    coord_fixed(0.35) + # this adjusts the width of saved figure (smaller = wider)
+    scale_x_continuous(name = "Time of day (local)", expand = c(0, 0), limits=c(-0.001,47.001),
+                       breaks = c(6, 12, 18, 24, 30, 36, 42, 48), 
+                       labels = c("", "12:00", "", "24:00", "", "12:00", "", "24:00")) +
+    scale_y_discrete(name = NULL, expand=c(0,0), limits=rev, breaks = breaks_y, labels=labels_y)+
+    labs(title = paste0(str_to_title(df.c$colony[1]), "\n", df.c$col_lat, "°N"), 
+         fill = "Mean\nactivity", size = 10, family = "Calbri",
+         subtitle = df.c$ringYr[1]) +
+    theme_bw(base_size = 12) +
+    theme(panel.border = element_rect(fill = NA), legend.key.size = unit(4, "mm"), 
+          plot.title = element_text(hjust = 0.5,), legend.position = "none",
+          plot.subtitle = element_text(face = "italic", size = 8, hjust = 0.5)) 
+  
+  acto_name <- paste0("act_", df.c$colony[1], "_", df.c$ringYr[1], "_", df.c$col_lat[1])
+  assign(acto_name, actogram_p)
+  
+  png(paste0(actograms.path, acto_name, ".png"))
+  print(actogram_p)
+  dev.off()
+  
+  acto_name.list[[i]] <- acto_name
+  
+}
+
+```
+
+# Plot representative birds
+
+These birds were selected for the manuscript as they had a substantial dataset with few gaps over the relevant period of time.
+
+```{r plot_representative_birds}
+
+# Set all to the same dates for comparison
+min_date <- as_day_month(format(min(breeding_dates$min_subset), "%d-%m"))
+max_date <- as_day_month(format(max(breeding_dates$max_subset), "%d-%m"))
+
+# Select ring numbers
+selected_birds <- read.csv("Data_inputs/BLKI_example_actograms.csv") 
+
+acto_name.list <- vector(mode = "list", length = nrow(selected_birds))
+
+for(i in 1:nrow(selected_birds)){
+  
+  df.c <- Acto_list[grepl(selected_birds$ID[i], names(Acto_list))]
+  df.c <- do.call("rbind", df.c)
+  
+  df.c$Rdayc <- as.factor(df.c$Rday)
+  df.c$month <- format(df.c$date,"%m")
+  
+  ## Cut to key dates
+  df.c %<>% 
+    mutate(day_month = as_day_month(format(date, "%d-%m"))) %>%
+    filter(day_month >= min_date & day_month <= max_date) %>%
+    select(-day_month)
+  
+  ## Set date breaks
+  unique_dates <- unique(df.c$date)
+  
+  if (length(unique_dates) > 15) {
+    indices <- seq(1, length(unique_dates), by = 7)
+    breaks_y <- unique(df.c$Rdayc)[indices]
+    labels_y <- unique(df.c$date)[indices]
+  } else next 
+  
+  # Make plot
+  actogram_p <- ggplot() +
+    geom_tile(aes(x = hour, y = Rdayc, fill = mean.act), data=df.c) + # colors tiles based on (mean) hourly activity. Must make column for hourly activity before running script
+    scale_fill_gradientn(colours = c("white", "#009688", "#00796B", "#004d40", "black")) +
+    geom_tile(data = df.c[is.na(df.c$Activity_NAs),], aes(x = hour, y = Rdayc), fill = "firebrick3", group = 1)  + #  colors NAs red
+    coord_fixed(0.35) + # this adjusts the width of saved figure (smaller = wider)
+    scale_x_continuous(name = "Time of day (local)", expand = c(0, 0), limits=c(-0.001,47.001),
+                       breaks = c(6, 12, 18, 24, 30, 36, 42, 48), 
+                       labels = c("", "12:00", "", "24:00", "", "12:00", "", "24:00")) +
+    scale_y_discrete(name = NULL, expand=c(0,0), limits=rev, breaks = breaks_y, labels=labels_y)+
+    labs(title = paste0(str_to_title(df.c$colony[1]), "\n", df.c$col_lat, "°N"), 
+         fill = "Mean\nactivity", size = 10, family = "Calbri",
+         subtitle = df.c$ringYr[1]) +
+    theme_bw(base_size = 12) +
+    theme(panel.border = element_rect(fill = NA), legend.key.size = unit(4, "mm"), 
+          plot.title = element_text(hjust = 0.5,), legend.position = "none",
+          plot.subtitle = element_text(face = "italic", size = 8, hjust = 0.5)) 
+  
+  acto_name <- paste0("act_", df.c$ring[1], "_", df.c$col_lat[1], "_", df.c$colony[1])
+  acto_name <- gsub(" ", "", acto_name)
+  assign(acto_name, actogram_p)
+  
+  acto_name.list[[i]] <- acto_name
+  
+}
+
+acto_name.df <- do.call("rbind", acto_name.list)
+acto_name.df <- data.frame(acto_name.df)
+acto_name.df$colony <- sapply(strsplit(acto_name.df$acto_name.df, "_"), tail, 1)
+acto_name.df$lat <-  acto_name.df$acto_name.df %>% strsplit("_") %>% sapply("[", 3)
+acto_name.df <- acto_name.df[order(acto_name.df$lat),]
+
+
+# Plot all actograms together (over two plots for readability) ----
+multiPlot1 <- cowplot::plot_grid(get(acto_name.df$acto_name.df[1])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[2])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[3])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,0,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[4])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        
+                        get(acto_name.df$acto_name.df[5])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[6])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,0,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[7])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,0,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[8])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,0,0,0), "cm")),
+                        
+                        get(acto_name.df$acto_name.df[9])+ theme(plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[10])+ theme(plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[11])+ theme(plot.margin = unit(c(0,0,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[12])+ theme(plot.margin = unit(c(0,0,0,0), "cm")),
+          
+                  ncol = 4, nrow = 3,
+                  align = c("hv") )
+
+
+multiPlot2 <- cowplot::plot_grid(get(acto_name.df$acto_name.df[13])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[14])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[15])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,0,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[16])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        
+                        get(acto_name.df$acto_name.df[17])+ theme(axis.title.x = element_blank(), plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[18])+ theme(plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[19])+ theme(plot.margin = unit(c(0,-1,0,0), "cm")),
+                        get(acto_name.df$acto_name.df[20])+ theme(plot.margin = unit(c(0,0,0,0), "cm")),
+                        
+                        get(acto_name.df$acto_name.df[21])+ theme(plot.margin = unit(c(0,0,0,0), "cm")),
+                        
+                        ncol = 4, nrow = 3,
+                        align = c("hv"))
+
+
+png(paste0(actograms.path, "FigureS5_actograms_1.png"), width = 14, height = 9, units = "in", res = 600)
+multiPlot1
+dev.off()
+
+png(paste0(actograms.path, "FigureS5_actograms_2.png"), width = 14, height = 9, units = "in", res = 600)
+multiPlot2
+dev.off()
+
+```

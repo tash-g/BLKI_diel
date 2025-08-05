@@ -1,0 +1,1119 @@
+---
+title: "Main analyses for: Evidence for latitude-driven changes in diel rhythms in a wide-ranging seabird"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Set-up
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+# Set whether to save new plots
+save_plot = TRUE # FALSE
+
+# Define the packages
+packages <- c("zoo", "stringr", "ggplot2", "binom", "grid", "mgcv", "lomb", 
+              "lubridate", "purrr", "dplyr","ggpubr", "magrittr", "lme4",
+              "reshape2", "sjPlot", "glmmTMB", "DHARMa", "gamlss", "broom.mixed",
+              "ggeffects", "segmented", "lomb", "tidyverse", "ggridges",
+              "ggOceanMaps", "sf", "ggspatial", "raster", "rnaturalearth", "gridExtra")
+
+# Install packages not yet installed - change lib to library path
+# installed_packages <- packages %in% rownames(installed.packages())
+# 
+# if (any(installed_packages == FALSE)) {
+#  install.packages(packages[!installed_packages])
+# }
+
+# Load packages and functions
+invisible(lapply(packages, library, character.only = TRUE))
+
+source("BLKI_functions.R")
+
+# Create data_outputs folder if doesn't already exist
+out.path <- "./Data_outputs/"
+
+# if(dir.exists(out.path) == FALSE) {
+#   dir.create(out.path)
+# }
+
+rename = dplyr::rename
+select = dplyr::select
+
+# Session info ----
+
+# > sessionInfo()
+# R version 4.3.2 (2023-10-31 ucrt)
+# Platform: x86_64-w64-mingw32/x64 (64-bit)
+# Running under: Windows 11 x64 (build 26100)
+# 
+# Matrix products: default
+# 
+# 
+# locale:
+# [1] LC_COLLATE=English_United Kingdom.utf8  LC_CTYPE=English_United Kingdom.utf8    LC_MONETARY=English_United Kingdom.utf8
+# [4] LC_NUMERIC=C                            LC_TIME=English_United Kingdom.utf8    
+# 
+# time zone: Europe/London
+# tzcode source: internal
+# 
+# attached base packages:
+#  [1] parallel  splines   grid      stats     graphics  grDevices utils     datasets  methods   base     
+# 
+# other attached packages:
+#  [1] segmented_2.1-3     MASS_7.3-60         ggeffects_1.3.2     broom.mixed_0.2.9.4 gamlss_5.4-20       gamlss.dist_6.1-1  
+#  [7] gamlss.data_6.0-2   DHARMa_0.4.6        glmmTMB_1.1.8       sjPlot_2.8.15       reshape2_1.4.4      magrittr_2.0.3     
+# [13] ggpubr_0.6.0        dplyr_1.1.4         purrr_1.0.2         lubridate_1.9.3     lomb_2.1.0          mgcv_1.9-0         
+# [19] nlme_3.1-163        binom_1.1-1.1       ggplot2_3.5.1       stringr_1.5.1       zoo_1.8-12          lmerTest_3.1-3     
+# [25] lme4_1.1-35.1       Matrix_1.6-3       
+# 
+# loaded via a namespace (and not attached):
+#  [1] gridExtra_2.3       rlang_1.1.2         furrr_0.3.1         compiler_4.3.2      vctrs_0.6.4         pkgconfig_2.0.3    
+#  [7] fastmap_1.1.1       backports_1.4.1     labeling_0.4.3      utf8_1.2.4          rmarkdown_2.27      pracma_2.4.4       
+# [13] haven_2.5.4         nloptr_2.0.3        xfun_0.51           jsonlite_1.8.9      sjmisc_2.8.9        broom_1.0.5        
+# [19] R6_2.5.1            stringi_1.8.1       parallelly_1.36.0   car_3.1-2           boot_1.3-28.1       pkgload_1.3.3      
+# [25] numDeriv_2016.8-1.1 estimability_1.4.1  Rcpp_1.0.11         knitr_1.45          modelr_0.1.11       timechange_0.2.0   
+# [31] tidyselect_1.2.1    rstudioapi_0.15.0   abind_1.4-5         yaml_2.3.7          TMB_1.9.9           codetools_0.2-19   
+# [37] sjlabelled_1.2.0    listenv_0.9.0       lattice_0.21-9      tibble_3.2.1        plyr_1.8.9          withr_3.0.2        
+# [43] bayestestR_0.15.2   coda_0.19-4.1       evaluate_0.23       future_1.33.0       survival_3.5-7      pillar_1.10.1      
+# [49] carData_3.0-5       insight_1.0.2       plotly_4.10.3       generics_0.1.3      hms_1.1.3           munsell_0.5.1      
+# [55] scales_1.3.0        minqa_1.2.6         globals_0.16.2      xtable_1.8-4        glue_1.6.2          emmeans_1.8.9      
+# [61] lazyeval_0.2.2      tools_4.3.2         data.table_1.14.8   ggsignif_0.6.4      forcats_1.0.0       mvtnorm_1.2-4      
+# [67] cowplot_1.1.1       tidyr_1.3.0         datawizard_1.0.0    colorspace_2.1-0    performance_0.13.0  cli_3.6.1          
+# [73] viridisLite_0.4.2   sjstats_0.18.2      gtable_0.3.6        rstatix_0.7.2       digest_0.6.33       htmlwidgets_1.6.3  
+# [79] farver_2.1.1        htmltools_0.5.7     lifecycle_1.0.4     httr_1.4.7         
+
+
+```
+
+Analyses are presented in the order in which they appear in the
+manuscript.
+
+## Load main dataset
+
+```{r load_main_dataset}
+
+load("Data_inputs/BLKI_gls-hourly-behaviour.RData")
+gls_hourly %>% 
+  summarise(n_colonies = n_distinct(colony),
+            n_rings = n_distinct(ring),
+            year_min = min(year), 
+            year_max = max(year))
+
+gls_hourly$colony[gls_hourly$colony == "Sklinna"] <- "Sør-Gjæslingan"
+gls_hourly$colony[gls_hourly$colony == "Witless Bay"] <- "Gull Island, Witless Bay"
+
+gls_hourly %<>% arrange(ring, datetime)
+gls_hourly %<>% mutate(ringYr = paste(ring, year, sep = "_"))
+
+
+```
+
+#### Figure 1
+
+```{r figure_1, eval = save_plot }
+
+# Load all data ----
+load("Data_inputs/BLKI_gls-hourly-behaviour.RData")
+n_birds <- gls_hourly %>% 
+  group_by(colony) %>%
+  summarise(n_birds = n_distinct(ring)) %>%
+  mutate(colony = ifelse(colony == "Witless Bay", "Gull Island, Witless Bay", colony))
+
+# Load colony data
+load("Data_inputs/BLKI_metadata_anon.RData")
+
+col_dat <- meta
+col_dat %<>% distinct(colony, .keep_all = TRUE) %>% 
+  rename(Lat = col_lat, Lon = col_lon) %>% arrange(colony) %>%
+  dplyr::select(c(colony, Lat, Lon))
+
+col_dat <- merge(col_dat, n_birds, by = "colony", all.x = T)
+col_dat$colony[col_dat$colony == "Gull Island, Witless Bay"] <- "Witless Bay"
+
+## Add Ossian Sars & Pyramiden manually
+add_cols <- data.frame(colony = c("Ossian Sarsfjellet", "Pyramiden"),
+                       Lat = c(78.928760, 78.656),
+                       Lon = c(12.444388, 16.328),
+                       n_birds = c(22, 5))
+
+col_dat <- rbind(col_dat, add_cols)
+col_dat %<>% arrange(colony)
+
+## Add ID labels for plotting
+col_dat$ID <- 1:nrow(col_dat)
+
+
+# Build the map ----
+
+## Full map
+col_filter <- col_dat %>% filter(!ID %in% c(1, 8, 13, 15, 16))
+
+full_map <- basemap(limits = c(-60, 25, 40, 85), land.col = "lightgrey") +
+  # Add rectangle for Svalbard 
+  geom_spatial_rect(aes(xmin = 10, xmax = 25.5,
+                        ymin = 76, ymax = 81),
+                    fill = NA, color = "forestgreen", linetype = "dashed", lwd = 1) +
+  # Add colony labels and points
+  geom_spatial_point(data = col_filter, aes(x = Lon, y = Lat, size = n_birds), fill = "orange", colour = "black", shape = 21) +
+  geom_spatial_label_repel(data = col_filter, aes(label = ID, x = Lon, y = Lat), segment.color = "black") +
+  labs(size = "Number of individuals") +
+  theme(panel.grid.major = element_line(size = 0.25, 
+                                        linetype = 'dashed',
+                                        colour = "darkgrey"),
+        axis.ticks = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(1,-6,1,1), "cm"),
+        legend.position = c(0.15, 0.15),
+        legend.background = element_rect(fill = "transparent", color = NA),
+        legend.key = element_rect(fill = "transparent", color = NA))
+
+
+## Svalbard map
+
+# Isolate Svalbard colonies
+sval_cols <- col_dat %>% filter(ID %in% c(1, 8, 13, 15, 16))
+sval_cols$gps <- "no"
+sval_cols$gps[sval_cols$colony  %in% c("Pyramiden", "Ossian Sarsfjellet")] <- "yes"
+
+# Build map
+sval_map <- basemap(limits = c(10.5, 25.5, 76.5, 80.5), land.col = "lightgrey", rotate = T) +
+  # Add colony labels and points 
+  geom_spatial_point(data = sval_cols, aes(x = Lon, y = Lat, fill = gps, size = n_birds), colour = "black", shape = 21) +
+  geom_spatial_label_repel(data = sval_cols, aes(label = ID, x = Lon, y = Lat), segment.color = "black") +
+  # Set colours
+  scale_fill_manual(values = c("orange", "darkorchid")) +
+  # Set map grid parameters
+  scale_y_continuous(breaks = seq(30, 85, by = 2)) +
+  scale_x_continuous(breaks = seq(-80, 70, by = 2)) +
+  labs(size = "Number of individuals") +
+  theme(panel.grid.major = element_line(size = 0.25, 
+                                        linetype = 'dashed',
+                                        colour = "darkgrey"),
+        panel.border = element_rect(size = 2,
+                                    colour = "forestgreen",
+                                    linetype = "dashed"),
+        axis.ticks = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(1,1,1,-6), "cm"),
+        legend.position = "none")
+
+
+# Output the full map  ----
+
+png("Figures/Figure1_colony_locations_map.png", 
+    width = 45, height = 30, units = "cm", res = 600)
+grid.arrange(full_map, sval_map, widths = c(2,1), heights = c(1,1))
+dev.off()
+
+```
+
+
+# Latitudinal variation in rhythmicity and period
+
+The analyses in this section rely primarily on immersion data because it provides a continuous, relatively noise-free proxy for time spent on water, which reflects behaviour relevant to circadian rhythms. 
+
+## Individual periods
+
+Code to produce the example actograms (Figures Sx and Sx) is included
+separately in the file '3_plot_actograms.Rmd'.
+
+*A note on the periodograms code*: Lomb-Scargle Periodogram analyses
+handles NAs, but the input data must be a two column dataframe with date
+and variable of interest. To capture a rhythm at least double the period
+length is needed. For 24 h rhythm that means a minimum of 48 h of
+sampling. Also, at minimum, the sampling frequency has to be half the
+rate or higher (more frequent) than the period of the rhythm (i.e. for a
+24 h rhythm, sampling has to be at least every 12 h).
+
+Read the documentation for `lsp` and `randlsp`. `randlsp` can take a
+long time to run if many data are included in a dataframe. `lsp` works
+well and is a fine alternative for large datasets. Periodicities don't
+change much, but p values are more precise with `randlsp`.
+
+In the below code I have 'to = 48' because the input data have a
+sampling fequency of 1 h, and I'm interested in perdiocities up to 48 h.
+If your data are collected at a higher or lower frequency this needs to
+be adjusted accordingly
+
+#### Table S3
+
+```{r TABLES3_continuous_days_per_individual}
+
+# Get simplified daily dataframe
+gls_daily <- gls_hourly %>% 
+  group_by(ring, colony, date) %>%
+  arrange(date) %>%
+  select(ring, colony, date) %>%
+  distinct()
+
+# Find number of continuous runs for each individual
+gls_daily %<>%
+  arrange(ring, colony, date) %>%
+  group_by(ring, colony) %>%
+  mutate(date_num = as.integer(date),
+         gap = date_num - lag(date_num, default = first(date_num)),
+         new_run = gap != 1,
+    # Create run ID by cumulative sum of new runs (start a new run when gap != 1)
+         run_id = cumsum(new_run) + 1 )
+
+# Summarise to get run length and start/end dates per run per bird-colony
+runs_summary <- gls_daily %>%
+  group_by(ring, colony, run_id) %>%
+  summarise(
+    run_start = min(date),
+    run_end = max(date),
+    run_length = n() )
+
+## Get summary stats for table
+table_s3 <- runs_summary %>%
+  group_by(colony) %>%
+  summarise( mean_run_length = mean(run_length),
+             sd_run_length = sd(run_length),
+             min_run_length = min(run_length),
+             max_run_length = max(run_length) ) %>%
+  arrange(colony)
+
+write.csv(table_s3, file = "Data_outputs/table_s3.csv", row.names = F)
+
+```
+
+*"We used the R package lomb (Ruf 1999) to estimate individual periods by applying the Lomb-Scargle periodogram method, which is effective for detecting weak periodic components in unevenly sampled time series."*
+
+```{r individual_periodograms, eval = FALSE}
+
+gls_hourly %<>% mutate(date = as.Date(datetime))
+
+# Split dataframe by ID
+acc_List <- split(gls_hourly, gls_hourly$ringYr)
+acc_List <- Filter(function(df) nrow(df) >= 48, acc_List)
+names(acc_List) <- sapply(acc_List, function(x) x$ringYr[1])
+T_names <- names(acc_List)
+
+median_ci.func <- function (values) {
+  
+  n = length(values)
+  h.re = replicate(10000, median(sample(values, n, rep=T)))
+  return(quantile(h.re, c(.025,.975)))
+  
+}
+
+# Periodogram analysis ----
+
+# Makes empty dataframe to be filled within the loop
+DF_lsp <- data.frame(ID = as.character(), 
+                     Period = as.numeric(),
+                     PNmax = as.numeric(),
+                     P_value = as.numeric())
+
+for(i in 1:length(acc_List)){
+  pb <- txtProgressBar(min = 0, max = length(acc_List), style = 3)
+  setTxtProgressBar(pb, i)
+	
+  # Subset dataframe to include only two relevant columns, NAs OK
+  TS <- acc_List[[i]][,c("datetime","imm.total")]
+  TS$time_days <- as.numeric(difftime(TS$datetime, min(TS$datetime), units = "days"))
+  res_lsp <- lsp(repeats = 1000, TS$time_days, TS$imm.total, to = 48, type = "period", ofac = 5, plot = F)
+  
+  # run loop through results to obtain the frequency with highest peak/test statistic and the associated test statistic and p value
+
+  DF_lsp_summary <- as.data.frame(summary(res_lsp))
+    
+  DF_lsp_indv <- data.frame(ID = as.character(names(acc_List[i])), 
+		                          Period = as.numeric(DF_lsp_summary[10,]),
+                              PNmax = as.numeric(DF_lsp_summary[9,]),  
+                              P_value = as.numeric(DF_lsp_summary[11,]))
+  DF_lsp <-  rbind(DF_lsp, DF_lsp_indv)
+    
+}
+
+close(pb)
+
+save(DF_lsp, file = "Data_outputs/individual_periodograms_with_time.RData")
+
+```
+
+```{r summarise_individual_periodograms}
+
+## Integrate meta to get colonies
+load("Data_outputs/individual_periodograms.RData")
+load("Data_inputs/BLKI_metadata_anon.RData")
+
+DF_lsp$ring <- DF_lsp$ID %>% strsplit("_") %>% sapply("[", 1)
+DF_lsp <- merge(DF_lsp, meta %>% select(-c(min_lay, min_subset, max_subset)), by = "ring")
+
+## Retain only significant periods
+signif_lsp <- subset(DF_lsp, P_value < 0.05)
+
+# Median/mean and standard error by colony ----
+
+LSP_Results_All <- DF_lsp %>%
+  dplyr::group_by(colony, col_lat) %>%
+  dplyr::summarise(Period_mean = mean(Period),
+                   Period_median = median(Period),
+                   Period_sd = sd(Period),
+                   PNmax_mean = mean(PNmax),
+                   PNmax_sd = sd(PNmax),
+                   P_value_mean = mean(P_value),
+                   P_value_sd = sd(P_value),
+                   N = n(),
+                   mad_med = mad(Period, constant = 1)) %>%
+  mutate(Period_se = Period_sd / sqrt(N),
+         Period_lower_ci = Period_mean - qt(1 - (0.05 / 2), N - 1) * Period_se,
+         Period_upper_ci = Period_mean + qt(1 - (0.05 / 2), N - 1) * Period_se,
+         Period_lower_mad = Period_median - mad_med / sqrt(N),
+         Period_upper_mad = Period_median + mad_med / sqrt(N)) %>%
+  arrange(col_lat)
+
+# Significant periods only
+LSP_Results_All.signif <- signif_lsp %>%
+  dplyr::group_by(colony, col_lat) %>%
+  dplyr::summarise(Period_mean = mean(Period),
+                   Period_median = median(Period),
+                   Period_sd = sd(Period),
+                   PNmax_mean = mean(PNmax),
+                   PNmax_sd = sd(PNmax),
+                   P_value_mean = mean(P_value),
+                   P_value_sd = sd(P_value),
+                   N = n(),
+                   mad_med = mad(Period, constant = 1)) %>%
+  mutate(Period_se = Period_sd / sqrt(N),
+         Period_lower_ci = Period_mean - qt(1 - (0.05 / 2), N - 1) * Period_se,
+         Period_upper_ci = Period_mean + qt(1 - (0.05 / 2), N - 1) * Period_se,
+         Period_lower_mad = Period_median - mad_med / sqrt(N),
+         Period_upper_mad = Period_median + mad_med / sqrt(N)) %>%
+  arrange(col_lat)
+
+
+# Proportion of rhythmic vs arrhythmic individuals ----
+
+# Median and range period
+range(DF_lsp$Period)
+median(DF_lsp$Period)
+mean(DF_lsp$Period)
+
+# Overall signif vs non-signif
+nrow(subset(DF_lsp, P_value < 0.05))/nrow(DF_lsp)
+nrow(subset(DF_lsp, P_value >= 0.05))/nrow(DF_lsp)
+
+# Proportion significant for each colony
+signif_period <- DF_lsp %>%
+  dplyr::group_by(colony, col_lat) %>%
+  dplyr::summarise(signif = sum(P_value < 0.05),
+                   nonsignif = sum(P_value >= 0.05),
+                   prop_signif = signif/n()) %>%
+  arrange(col_lat)
+
+# Model likelihood of period significance as a function of colony latitude
+DF_lsp %<>% mutate(signif_period = ifelse(P_value < 0.05, 1, 0))
+
+signif_glmm.ind <- glmmTMB(signif_period ~ col_lat + (1 | ring),
+                      data = DF_lsp,
+                      family = binomial())
+
+plot(DHARMa::simulateResiduals(signif_glmm.ind))
+summary(signif_glmm.ind)
+
+n_distinct(DF_lsp$ring)
+
+```
+
+#### Figure 2: Ridgeplot and median periods for each colony
+
+```{r FIGURE_2, eval = save_plot}
+
+period_ridges <- ggplot() + 
+  geom_density_ridges(data = DF_lsp,
+                      aes(y = as.factor(col_lat), x = Period,
+                          fill = col_lat), rel_min_height = 0.001, scale = 1.5, alpha = 0.7) +
+  geom_point(data = LSP_Results_All, 
+                aes(y = as.factor(col_lat), x = Period_median), colour = "magenta4", shape = 18, size = 3) +
+  geom_errorbarh(data = LSP_Results_All, 
+                aes(y = as.factor(col_lat), xmin = Period_median - mad_med, xmax = Period_median + mad_med),
+                colour = "magenta4",
+                height = 0.2,
+                size = 1) +
+  scale_x_continuous(limits = c(0, 48)) +
+  labs(y = "Colony latitude (°N)", x = "Period length (hours)", fill = "Lat N",
+       tag = "(A)") +
+  BLKI_theme +
+  theme(legend.justification = "top")
+
+
+med_period <- ggplot() +
+  geom_point(data = signif_lsp, aes(x = col_lat, y = Period), col = "grey50", alpha = 0.5) +
+  geom_errorbar(data = LSP_Results_All.signif, aes(x = col_lat, ymin = Period_median - mad_med, ymax = Period_median + mad_med), col = "magenta4", size = 1, width = 0.25) +
+  geom_point(data = LSP_Results_All.signif, aes(x = col_lat, y = Period_median),
+             , col = "magenta4", size = 2, shape = 18) + 
+  labs(y = "Median period", x = "Colony latitude °N", tag = "(B)") +
+  geom_hline(yintercept = 24, linetype = "dashed", col = "grey50", size  =1) +
+  #geom_vline(xintercept = 66.5, linetype = "dotted", col = "grey50", size = 1) +
+  scale_y_continuous(breaks = seq(25, 45, by = 5)) +
+  BLKI_theme
+
+
+png(file = "Figures/Figure2_median_periods.png", width = 21, height = 9, units = "in", res = 600)
+ggpubr::ggarrange(period_ridges, med_period, nrow = 1,
+                  widths = c(1, 0.85))
+dev.off()
+
+```
+
+#### Figure S4: Probability of significant period with colony latitude
+
+*"First, we used a generalised linear mixed effects model (GLMM) with a binomial distribution to test whether the probability that individuals exhibit significant periods depended on colony latitude."*
+
+```{r FIGURE_S4, eval = save_plot}
+
+effects.signif <- data.frame(ggeffects::ggpredict(signif_glmm.ind, terms = "col_lat")) %>% 
+  dplyr::rename(col_lat = x)
+
+plot.signif <- ggplot() +
+  geom_point(data = signif_period, aes(x = col_lat, y = prop_signif),
+             col = "grey50") +
+  geom_line(data = effects.signif, aes(x = col_lat, y = predicted),
+            linewidth = 1, col = "magenta4") +
+  geom_ribbon(data = effects.signif, aes(x = col_lat, ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") + 
+  labs(y = "Proportion of birds with significant period lengths",
+       x = "Colony latitude °N") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme
+
+png(file = "Figures/FigureS4_prop_signif_periods.png", width = 9, height = 7, units = "in", res = 600)
+plot.signif
+dev.off()
+
+```
+
+## Colony-level periodicity
+
+```{r visualise_colony_immersion_patterns}
+
+pop_mean_imm <- gls_hourly %>%
+  group_by(colony, col_lat, col_lon, date, hour) %>%
+  summarise(imm.mean = mean(imm.total)) %>%
+  data.frame()
+
+save(pop_mean_imm, file = "Data_outputs/pop_mean_immersion.RData")
+
+ind_mean_imm <- gls_hourly %>%
+  group_by(ring, colony, col_lat, col_lon, date, hour) %>%
+  summarise(imm.mean = mean(imm.total)) %>%
+  data.frame()
+
+save(ind_mean_imm, file = "Data_outputs/ind_mean_immersion.RData")
+
+load("Data_outputs/ind_mean_immersion.RData")
+load("Data_outputs/pop_mean_immersion.RData")
+
+colonies <- unique(pop_mean_imm$colony[order(pop_mean_imm$col_lat)])
+plot_list.pop <- vector(mode = "list", length = length(colonies))
+
+for (i in 1:length(colonies)) {
+ 
+  pop_mean_imm.df <- pop_mean_imm %>% 
+    filter(colony == colonies[[i]]) 
+  
+  ind_mean_imm.df <- ind_mean_imm %>% 
+    filter(colony == colonies[[i]]) 
+  
+  mean_imm.plot <- ggplot() +
+    geom_point(data = pop_mean_imm.df,
+               aes(x = hour, y = imm.mean, colour = as.factor(date)),
+               alpha = 0.2) +
+    geom_smooth(data = ind_mean_imm.df,
+                aes(x = hour, y = imm.mean, group = as.factor(ring)),
+                colour = "grey70",
+                se = F,
+                size = 0.8,
+                method = "gam") +
+    geom_smooth(data = pop_mean_imm.df,
+                aes(x = hour, y = imm.mean),
+                colour = "magenta4",
+                size = 2,
+                method = "gam") +
+    scale_colour_viridis_d() +  
+    ggtitle(paste0(colonies[i], ", ", round(pop_mean_imm.df$col_lat[1], digits = 2))) +
+    labs(x = "Hour of day", y = "Mean immersion") +
+    scale_x_continuous(breaks = seq(0, 24, 4), limits = c(0, 23)) +
+    BLKI_theme +
+    theme(legend.position = "none",
+          plot.margin = unit(c(0, 0.25, 0, 0), "cm"),
+          plot.title = element_text(size = 20, hjust = 1),
+          axis.text.x = element_text(size = 18), 
+          axis.text.y = element_text(size = 18), 
+          axis.title.x = element_text(size = 20),
+          axis.title.y = element_text(size = 20),
+          plot.title.position = 'plot')
+  
+  if (i %in% c(1:6)) {
+    mean_imm.plot <- mean_imm.plot + theme(plot.margin = unit(c(0.5, 0.25, 0, 0), "cm"))
+  }
+  
+  if (!(i %in% c(1, 7, 13, 19))) {
+    mean_imm.plot <- mean_imm.plot + theme(axis.text.y = element_blank(), axis.title.y = element_blank())
+  }
+  
+  if (!(i %in% c(17:22))) {
+    mean_imm.plot <- mean_imm.plot + theme(axis.text.x = element_blank(), axis.title.x = element_blank())
+  }
+  
+  plot_list.pop[[i]] <- mean_imm.plot  
+  
+}
+
+```
+
+#### Figure S6: Immersion trends by colony
+
+```{r FIGURE_S6, eval = save_plot}
+
+png("Figures/FigureS6_immersion_by_colony.png", 
+    width = 25, height = 20, units = "in", res = 650)
+cowplot::plot_grid(plotlist = plot_list.pop, nrow = 4, align = "hv",
+                   ncol = 6)
+dev.off()
+
+```
+
+
+## Variation in individual rhythms (by ACF)
+
+*"Next, we fitted autocorrelation functions to examine the strength of colony-level rhythmicity. Functions were fitted to each individual, and the results aggregated across each colony."*
+
+```{r individual_rhythms}
+
+# Find length of time series for each nest
+gls_hourly %<>% mutate(ringYr = paste(ring, year, sep = "_"))
+bird.ts <- tapply(gls_hourly$datetime, list(gls_hourly$ringYr), function(x)(length(x))/2)
+mean(bird.ts); sd(bird.ts); qt(0.975,df=length(bird.ts)-1)*sd(bird.ts)/sqrt(length(bird.ts)) 
+
+## Split the dataframe by ringYr so can apply function to each individual within each year
+gls_hourly_split <- data.frame(gls_hourly[,c("ringYr","imm.total")])
+gls_hourly_split <- split(gls_hourly_split, gls_hourly_split$ringYr)
+
+ind_ACF <- lapply(gls_hourly_split,
+                  function(x) acf(x$imm.total, na.action = na.pass, lag = 60,
+                                  plot = FALSE, main = x$ringYr[1])) 
+
+# Create a dataframe from list output
+ACF.df <- as.data.frame(unlist(ind_ACF))
+ACF.df <- cbind(Row.Names = rownames(ACF.df), ACF.df)
+
+## Extract rings 
+ACF.df$ringYr <- substr(as.character(ACF.df$Row.Names),1,12)
+ACF.df$ringYr <- as.factor(ACF.df$ringYr)
+ACF.df %<>% separate(ringYr, c("ring", "year"), sep = "_", remove = F)
+
+## Find lag ID
+ACF.df$Lag <- substr(as.character(ACF.df$Row.Names),14,nchar(as.character(ACF.df$Row.Names)))
+
+## Isolate acf values
+ACF.df$ACF_ID <- str_sub(ACF.df$Lag, 1,3)
+
+ACF.df$Lag <- substring(ACF.df$Lag, 4)
+ACF.df$Lag <- as.numeric(ACF.df$Lag)
+
+ACF.df <- dplyr::rename(ACF.df, ACF = "unlist(ind_ACF)")
+ACF.df$ACF <- as.numeric(ACF.df$ACF)
+
+ACF.df$Row.Names <- NULL
+
+## Isolate acf values
+ACF.df <- subset(ACF.df, ACF_ID == "acf")
+
+## Calculate CIs for plotting
+n <- nrow(gls_hourly)
+z <- qnorm((1 + 0.95) / 2)
+se_acf <- 1 / sqrt(n)
+
+ACF.df$lower_ci <- ACF.df$ACF - z * se_acf
+ACF.df$upper_ci <- ACF.df$ACF + z * se_acf
+
+# Merge in colony info
+colonies <- gls_hourly %>% select(c(ring, colony, col_lat)) %>% distinct(ring, .keep_all = TRUE) 
+ACF.df <- merge(ACF.df, colonies, by = "ring")
+
+
+# Plot ACF for each individual by colony -----
+
+colonies <- unique(ACF.df$colony[order(ACF.df$col_lat)])
+plot_list.ind <- vector(mode = "list", length = length(colonies))
+
+for (i in 1:length(colonies)) {
+  
+  acf_plot <- subset(ACF.df, colony == colonies[i])
+  
+  ACF.ind_plot <- ggplot(acf_plot, aes(x = Lag, y = ACF, col = ringYr)) + 
+    geom_line() +
+    geom_hline(yintercept = c(0)) +
+    geom_line(alpha = 0.5) +
+    scale_y_continuous(breaks = seq(-1, 1, 0.5), limits = c(-1,1), expand = c(0,0)) +
+    scale_x_continuous(breaks = seq(0, 60, 12), limits = c(0, 60), expand = c(0,0)) +
+    BLKI_theme +
+    ggtitle(paste0(colonies[i], ", ", round(acf_plot$col_lat[1], digits = 2))) +
+    theme(legend.position = "none",
+          plot.margin = unit(c(0, 0.25, 0, 0), "cm"),
+          plot.title = element_text(size = 20, hjust = 1),
+          axis.text.x = element_text(size = 18), 
+          axis.text.y = element_text(size = 18), 
+          axis.title.x = element_text(size = 20),
+          axis.title.y = element_text(size = 20),
+          plot.title.position = 'plot')
+  
+  if (i %in% c(1:6)) {
+    ACF.ind_plot <- ACF.ind_plot + theme(plot.margin = unit(c(0.5, 0.25, 0, 0), "cm"))
+  }
+  
+  if (!(i %in% c(1, 7, 13, 19))) {
+    ACF.ind_plot <- ACF.ind_plot + theme(axis.text.y = element_blank(), axis.title.y = element_blank())
+  }
+  
+  if (!(i %in% c(17:22))) {
+    ACF.ind_plot <- ACF.ind_plot + theme(axis.text.x = element_blank(), axis.title.x = element_blank())
+  }
+  
+  plot_list.ind[[i]] <- ACF.ind_plot  
+  
+}
+
+```
+
+#### Figure S7: Individual ACFs
+
+```{r FIGURE_S7, eval = save_plot}
+
+png("Figures/FigureS7_individual_imm_ACF.png", 
+    width = 25, height = 20, units = "in", res = 600)
+cowplot::plot_grid(plotlist = plot_list.ind, nrow = 4, align = "hv",
+                   ncol = 6)
+dev.off()
+
+```
+
+## Deviations in period length from 12, 24, 48 hours
+
+*"Second, we fitted a GLMM with a gamma distribution to examine the effect of colony latitude on absolute deviation from a 24-hour period."*
+
+```{r deviation_by_lat}
+
+refs <- c(12, 24, 48)
+
+signif_lsp %<>% rowwise() %>% mutate( deviation = min(abs(Period - refs)) )
+DF_lsp %<>% rowwise() %>% mutate( deviation = min(abs(Period - refs)) )
+
+period_glm.signif <- glm(deviation ~ col_lat, 
+                 data = signif_lsp, 
+                 family = Gamma(link = "log"))
+
+plot(DHARMa::simulateResiduals(period_glm.signif))
+summary(period_glm.signif)
+
+n_distinct(signif_lsp$ring)
+
+## Perform for all individuals
+period_glm.all <- glm(deviation ~ col_lat, 
+                 data = DF_lsp, 
+                 family = Gamma(link = "log"))
+
+plot(DHARMa::simulateResiduals(period_glm.all))
+summary(period_glm.all)
+
+
+```
+
+#### Figure 3 & S8: Absolute deviation by colony
+
+```{r FIGURE_3_S8}
+
+# Get effects
+period_glmm_signif.df <- data.frame(ggpredict(period_glm.signif, terms = "col_lat")) %>%
+  dplyr::rename(col_lat = x)
+period_glmm_all.df <- data.frame(ggpredict(period_glm.all, terms = "col_lat")) %>%
+  dplyr::rename(col_lat = x)
+
+# Build the plots
+period_glmm_signif.plot <- ggplot() +
+  geom_point(data = signif_lsp, aes(x = col_lat, y = deviation), 
+             position = position_jitter(width = 0.25),
+             colour = "grey50") +
+  geom_ribbon(data = period_glmm_signif.df, aes(y = predicted, x = col_lat,
+                                               ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") +
+  geom_line(data = period_glmm_signif.df, aes(y = predicted, x = col_lat),
+            linewidth = 1, col = "magenta4") +
+  labs(x = expression("Colony latitude °N"), y = "Absolute deviation from 12-, 24-, and 48-hour periods",
+       caption = "") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme
+
+## All birds ##
+period_glmm_all.plot <- ggplot() +
+  geom_point(data = DF_lsp, aes(x = col_lat, y = deviation), 
+             position = position_jitter(width = 0.25),
+             colour = "grey50") +
+  geom_ribbon(data = period_glmm_all.df, aes(y = predicted, x = col_lat,
+                                               ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") +
+  geom_line(data = period_glmm_all.df, aes(y = predicted, x = col_lat),
+            linewidth = 1, col = "magenta4") +
+  labs(x = expression("Colony latitude °N"), y = "Absolute deviation from 12-, 24-, or 48-hour period",
+       caption = "") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme
+
+
+# Save plots
+png(file = "Figures/Figure3_period_length.png", width = 9, height = 7, units = "in", res = 600)
+period_glmm_signif.plot
+dev.off()
+
+png(file = "Figures/FigureS8_period_length.png", width = 9, height = 7, units = "in", res = 600)
+period_glmm_all.plot
+dev.off()
+
+
+```
+
+
+### Peak lag and strength as a function of latitude
+
+*"Following previously established methods (Levine et al. 2002; Huffeldt and Merkel 2016), we quantified the strength of rhythmicity by calculating peak strength, which is the difference in correlation value between first peak and first trough in the autocorrelation function."*
+
+```{r calc_peak_strength}
+
+peak_strengths <- ACF.df %>%
+  group_by(ringYr, ring, colony, col_lat) %>%
+  summarise(peak_strength = get_peak_strength(cur_data_all()), .groups = "drop")
+
+save(peak_strengths, file = "Data_outputs/ind_peak_strength.RData")
+
+load("Data_outputs/ind_peak_strength.RData")
+
+peak_strength.lmm <- lmer(peak_strength ~ col_lat + (1|ring), data = peak_strengths)
+summary(peak_strength.lmm)
+median(peak_strengths$peak_strength)
+n_distinct(peak_strengths$ring)
+
+```
+
+#### Figure 4: Peak ACF strength by latitude
+
+```{r FIGURE_4, eval = save_plot}
+
+peak_strength.lmm.df <- data.frame(ggpredict(peak_strength.lmm, terms = "col_lat")) %>% 
+  dplyr::rename(col_lat = x) 
+
+# Build the plot
+peak_strength.lmm.plot <- ggplot() +
+  geom_jitter(data = peak_strengths, aes(x = col_lat, y = peak_strength), 
+              col = "grey50", alpha = 0.5,  width = 0.3, height = 0) +
+  scale_colour_viridis_d() +  
+  geom_ribbon(data = peak_strength.lmm.df, aes(y = predicted, x = col_lat,
+                                              ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") +
+  geom_line(data = peak_strength.lmm.df, aes(y = predicted, x = col_lat),
+            linewidth = 1, col = "magenta4") +
+  labs(x = expression("Colony latitude °N"), y = "Peak strength") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme +
+  theme(legend.position = "none")
+
+png("Figures/Figure4_LM_peak_by_lat.png",
+    width = 9, height = 7, units = "in", res = 600)
+peak_strength.lmm.plot
+dev.off()
+
+```
+
+
+# Sun elevation as a driver of rhythms
+
+```{r sun_elevation_initial_random_sampling, eval = FALSE}
+
+# Subset the data to random 72 hour samples to make manageable
+set.seed(817)
+random_sample <- subsample_by_hours(gls_hourly, 72)
+
+random_sample$ring <- as.factor(random_sample$ring)
+random_sample$date <- as.Date(random_sample$datetime)
+
+save(random_sample, file = "Data_outputs/subsampled_kits.RData")
+
+```
+
+```{r sun_elevation_GAM, eval = FALSE}
+
+load("Data_outputs/subsampled_kits.RData")
+
+gam_model_sun_lat <- mgcv::gam(imm.total ~ te(sun_altitude, col_lat) + s(ring, bs = "re"),
+                              data = random_sample, family = gaussian())
+
+save(gam_model_sun_lat, file = "Data_outputs/GAM_activity_sun.RData")
+
+gam.check(gam_model_sun_lat)
+summary(gam_model_sun_lat)
+
+```
+
+```{r sun_elevation_randomisation, eval = FALSE}
+
+# This takes a long time to run. Resamples the data and refits the GAM for n = 100 iterations.
+
+edf_results.list <- vector(mode = "list", length = 100)
+
+for (i in 1:100) {
+  cat("Iteration:", i, "\n")
+  
+  # Subsample
+  random_sample <- subsample_by_hours(gls_hourly, 72)
+  random_sample$ring <- as.factor(random_sample$ring)
+  random_sample$date <- as.Date(random_sample$datetime)
+  
+  print(paste0("Now fitting model...", i))
+  
+  # Fit the GAM
+  gam_model <- try(mgcv::gam(imm.total ~ te(sun_altitude, col_lat) + s(ring, bs = "re"),
+                             data = random_sample, family = gaussian()), silent = TRUE)
+  
+  # Skip to next iteration if model failed
+  if (inherits(gam_model, "try-error")) next
+  
+  # Extract EDFs and p-values
+  smry <- summary(gam_model)
+  mod_terms <- data.frame(smry$s.table)
+  
+  te_edf <- mod_terms$edf[grep("sun_altitude", rownames(mod_terms))]
+  te_pval <- mod_terms$p.value[grep("sun_altitude", rownames(mod_terms))]
+  
+  edf_results.list[[i]] <- data.frame(iteration = i,
+                                       te_edf = te_edf,
+                                       te_pval = te_pval)
+}
+
+# Save results
+edf_results <- do.call("rbind", edf_results.list)
+save(edf_results, file = "Data_outputs/gam_edf_results.RData")
+
+```
+
+#### Figure S9
+
+```{r FIGURE_S9, eval = save_plot}
+
+load("Data_outputs/GAM_activity_sun.RData")
+load("Data_outputs/subsampled_kits.RData")
+
+lat_vals <- quantile(random_sample$col_lat, probs = c(0.1, 0.25, 0.5, 0.75, 0.9), na.rm = TRUE)
+lat_vals <- unique(random_sample$col_lat)
+
+## Choose representative latitudes (e.g., min, median, max)
+lat_ranges <- map_dfr(lat_vals, function(lat) {
+  range <- range(random_sample$sun_altitude[random_sample$col_lat == lat], na.rm = TRUE)
+  data.frame(
+    col_lat = lat,
+    min_sun = range[1],
+    max_sun = range[2]
+  )
+})
+
+## Build prediction grid respecting actual ranges
+pred_grid <- purrr::pmap_dfr(lat_ranges, function(col_lat, min_sun, max_sun) {
+  data.frame(
+    sun_altitude = seq(min_sun, max_sun, length.out = 100),
+    col_lat = col_lat
+  )
+})
+
+## Predict on grid (include intercept, no random effects)
+pred_grid$ring <- "BLKI001"
+pred_grid$ring <- as.factor(pred_grid$ring)
+
+# Predict
+pred_grid$predicted <- predict(gam_model_sun_lat, newdata = pred_grid, type = "response", re.form = NA)
+pred_grid$col_lat_f <- factor(round(pred_grid$col_lat, 2))
+
+# Plot
+
+png("Figures/FigureS9_GAM_activity_by_sun.png", 
+    width = 9, height = 7, units = "in", res = 600)
+ggplot(pred_grid, aes(x = sun_altitude, y = predicted, color = col_lat, group = col_lat)) +
+  geom_line(size = 1.2, alpha = 0.5) +
+  labs(x = expression("Sun elevation angle ("*~degree*")"),
+       y = "Predicted hourly immersion",
+       color = expression("Colony latitude ("*~degree*" North)")) +
+  BLKI_theme +
+  theme(legend.position = c(0.88, 0.85),
+        legend.background = element_rect(fill = "transparent", colour = NA))
+dev.off()
+
+```
+
+
+#### Figure S10
+
+```{r FIGURE_S10_sun_elevation_randomisation_output, eval = save_plot}
+
+load("Data_outputs/GAM_activity_sun.RData")
+load("Data_outputs/gam_edf_results.RData")
+
+mean(edf_results$te_edf)
+sd(edf_results$te_edf)
+
+# Plot histogram of te for randomisation and main model
+smry <- summary(gam_model_sun_lat)
+mod_terms <- data.frame(smry$s.table)
+  
+te_edf.main <- mod_terms$edf[grep("sun_altitude", rownames(mod_terms))]
+
+te_plot <- ggplot(edf_results, aes(x = te_edf)) +
+  geom_histogram(fill = "grey50") +
+  geom_vline(xintercept = te_edf.main, 
+             col = "magenta4", linetype = "dashed", size = 1) +
+  labs(x = "EDF of sun elevation × latitude smooth", y = "Count") +
+  BLKI_theme
+
+png("Figures/FigureS10_GAM_randomisation_output.png", 
+    width = 9, height = 7, units = "in", res = 600)
+te_plot
+dev.off()
+
+```
+
+# Latitudinal variation in behaviour
+
+Is there evidence that activity varies with time of day, and that this
+daily pattern changes with latitude? Specifically, is there a dawn/dusk
+peak at low latitudes that flattens at high latitudes?
+
+We fitted a generalized additive mixed model (GAMM) using a tensor
+product smooth (`t2`) to capture the joint effect of hour of day and
+colony latitude on activity (binomial response, active/inactive). The
+model included a random effect of ring ID to account for repeated
+measures. To test whether the timing of activity varied with latitude,
+we compared two GAM structures:
+
+1.  An additive model with separate smooth terms for time of day (hour,
+    modeled cyclically) and colony latitude.
+
+2.  An interaction model employing a tensor product smooth between hour
+    (cyclic cubic spline) and latitude (thin plate spline), allowing the
+    effect of time to vary flexibly with latitude.
+
+Models were fitted using the `bam` function from the `mgcv` package with
+fast restricted maximum likelihood (fREML) estimation for computational
+efficiency. Model comparison was conducted via AIC and likelihood ratio
+tests.
+
+```{r visualise_latitudinal_variation_behaviour}
+
+# First, visualise changes in average behaviour to get a picture of effects
+gls_hourly.avg <- gls_hourly %>%
+  group_by(colony, hour) %>% 
+  summarise(activity.avg = mean(activity.mins, na.rm = T),
+            col_lat = col_lat[1])
+
+ggplot() +
+  geom_line(data = gls_hourly.avg, aes(x = hour, y = activity.avg, group = colony, col = col_lat)) +
+  labs(y = "Average activity", x = "Hour of day", colour = "Latitude") +
+  BLKI_theme
+
+```
+
+```{r model_latitudinal_variation_behaviour, eval = FALSE}
+
+# Reformat variables for models
+gls_hourly$hour <- as.numeric(gls_hourly$hour)
+gls_hourly$ring <- as.factor(gls_hourly$ring)
+
+# Fit GAM using interaction of hour of day and colony latitude
+mod_bam <- bam(
+  cbind(activity.mins, 60 - activity.mins) ~ t2(hour, col_lat, bs = c("cc", "tp"), k = c(6, 4)) +
+    s(ring, bs = "re"),
+  family = binomial,
+  data = gls_hourly,
+  method = "fREML",
+  discrete = TRUE )
+
+save(mod_bam, file = "Data_outputs/bam_activity_int.RData")
+
+gam.check(mod_bam)
+vis.gam(mod_bam, view = c("hour", "col_lat"), plot.type = "contour")
+
+## Fit an additive model to look at significance of the interaction term
+mod_add <- bam(
+   cbind(activity.mins, 60 - activity.mins) ~ 
+    s(hour, bs = "cc", k = 6) +    
+    s(col_lat, bs = "tp", k = 4) + 
+    s(ring, bs = "re"),   
+  family = binomial,
+  data = gls_hourly,
+  method = "fREML",
+  discrete = TRUE )
+
+save(mod_add, file = "Data_outputs/bam_activity_add.RData")
+
+```
+
+```{r activity_GAM_results}
+
+load("Data_outputs/bam_activity_int.RData")
+load("Data_outputs/bam_activity_add.RData")
+
+AIC(mod_add, mod_bam)
+anova(mod_add, mod_bam, test = "Chisq")
+
+summary(mod_bam)
+
+```
+
+#### Figure 5
+
+```{r FIGURE_5, eval = save_plot}
+
+load("Data_outputs/bam_activity_int.RData")
+
+gls_hourly$hour <- as.numeric(gls_hourly$hour)
+gls_hourly$ring <- as.factor(gls_hourly$ring)
+
+# Make a dataset to predict from
+newdata_slices <- expand.grid(
+  hour = seq(0, 23, by = 1),
+  col_lat = seq(min(gls_hourly$col_lat), max(gls_hourly$col_lat), length.out = 5) )
+
+## Add dummy ring to dataset
+ring_level <- levels(gls_hourly$ring)[1]
+newdata_slices$ring <- factor(ring_level, levels = levels(gls_hourly$ring))
+
+## Predict from the model
+newdata_slices$fit <- predict(mod_bam, newdata = newdata_slices, type = "response")
+
+## Make the plot
+
+### Sample some datapoints for plotting
+gam_plot <- ggplot(newdata_slices, aes(x = hour, y = fit, colour = col_lat, group = col_lat)) +
+  geom_line(size = 1) +
+  labs(x = "Hour of day", y = "Proportion of hour in activity", colour = "Latitude") +
+  BLKI_theme +
+  theme(legend.position = c(0.92, 0.85),
+        legend.background = element_rect(fill = "transparent", colour = NA),
+        legend.key = element_rect(fill = "transparent", colour = NA)) 
+
+png("Figures/Figure5_GAM_activity_by_hour.png", 
+    width = 9, height = 7, units = "in", res = 600)
+gam_plot
+dev.off()
+
+```
+
