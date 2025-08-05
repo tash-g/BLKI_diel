@@ -71,7 +71,7 @@ This script separates trips to sea from colony time in the GLS datasets, using t
 
 This file is designed to work with the original immersion datasets and the non-anonymised metadata, which are available by request from SEATRACK. As a result it will not run 'out of the box' with the rest of the scripts, and is thus included here only for review and context.
 
-```{r extra_trips_from_gls}
+```{r trips_from_gls}
 
 # Set parameters for trip identification
 rolling.width <- 20
@@ -228,11 +228,7 @@ for (i in 1:length(gls_files)) {
     
     ## Where duplicates, remove the trip value
     att.df <- att.df[!duplicated(att.df[c("ring","datetime")]),]
-    
-    ## Calculate proportional attendance
     att.df <- merge(att.df, total.dur, by = c("date", "hour"), all.x = T)
-    att.df %<>% mutate(prop_att = mins_att / total_duration) %>% arrange(datetime)
-    
     
     # Get activity per hour #
     mydf$hour <- format(mydf$datetime, "%H")
