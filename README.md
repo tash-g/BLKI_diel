@@ -2,81 +2,42 @@
 Natasha Gillies, Sébastien Descamps, Nicholas P. Huffeldt, Frederick McKendrick, Tycho Anker-Nilssen, Maria Bogdanova, Vegard Sandøy Bråthen, Olivier Chastel, Signe Christensen-Dalsgaard, Francis Daunt, Nina Dehnhard, Alexey Viktorovich Ezhov, Annette Fayet, Morten Frederiksen, Maria Gavrilo, April Hedd, Yann Kolbeinsson, Yuri Vladimirovich Krasnov, Aili Labansen, Jannie Linnebjerg, Svein-Håkon Lorentsen, Flemming R. Merkel, Børge Moe, Mark Newell, Stephen Newton, Bergur Olsen, Tone Reiertsen, Greg Robertson, Hallvard Strøm, Thorkell Lindberg Thorarinsson, Samantha C. Patrick
 
 ## Overview
-This repository contains scripts and data to recreate the main results and figures of this paper (currently in submission). 
+This repository contains scripts and data to recreate the main results and figures of this paper (currently in submission). Analyses have been tested in R version 4.3.2 (2023-10-31 ucrt). Individual packages are listed under the 'Session Info' of each R Markdown file.
 
 ## Scripts
-A short description of each script is given below. Note that the raw geolocator/salt-water immersion data are provided by the [SEATRACK](https://seapop.no/en/seatrack/) project and so are not shared here. Those interested in using these data should contact the authors/SEATRACK for further information.
+A short description of each script is given below. All files are provided as R markdown documents to aid interpretation and reproducibility. Note that the raw geolocator/salt-water immersion data are provided by the [SEATRACK](https://seapop.no/en/seatrack/) project and so are not shared here. Those interested in using these data should contact the authors/SEATRACK for further information.
 
-- **1_extract-trips-and-behaviour.R** Extracts colony visitation/foraging trips and at-sea behaviour (rest, flight, foraging) from salt water immersion data collected from geolocator devices. Original salt water immersion data is not presented here (see above), but datasets in Data_inputs folder can be used to run the remaining scripts.
-- **2_prepare_attendance_data.R** Converts colony visitation data above into a time series for ACF analysis.
-- **3_statistical_analysis.R** Code and functions to carry out all statistical analyses in the manuscript. 
-- **3b_statistic_analysis-randomised-GAM.R** Randomly samples attendance data and fits to a GAM examining the predictive power of sun elevation angle on activity levels. Includes code to run the randomisation on a high-throughput system such as _Condor_.
-- **4_individual-LombScargle_periodograms.R** Code and to construct and analyse individual periods by constructing periodograms.
-- **BLKI_functions.R** Contains custom functions to run each of the above scripts. Must be run for the scripts to work effectively.
+- **1_data_processing.Rmd** Extracts colony visitation/foraging trips and at-sea behaviour (rest, flight, foraging) from saltwater immersion data collected via geolocators. The original data are not included (see above). Provided for transparency; not needed to reproduce manuscript results.
+- **2_main_analysis.Rmd** Code and functions to carry out all statistical analyses in the manuscript. 
+- **3_plot_actograms.Rmd** Plots actograms for all birds and the representative examples included in the manuscript.
+- **BLKI_functions.R** Contains custom functions to run each of the above scripts. 
+- **SI_validate_trips.Rmd** Compares trips identified via GPS with those identified from immersion data. For transparency only; not required for main analyses.
 
 ## Data inputs
 
-These data are used in the above scripts. Note that all Rings/BirdIDs have been recoded and so cannot be linked to existing datasets. Please contact the authors if you would like to make use of these datasets, as we may be able to offer additional information, data, or advice. 
+These data are used in the above scripts. Note that all Rings/identities have been recoded and so cannot be linked to existing datasets. Please contact the authors if you would like to make use of these datasets, as we may be able to offer additional information, data, or advice. 
 
-- **BLKI_attendance_2013-2022.Rdata** This is the main dataset for analysis. Each row represents an hour of a day for each individual bird. Data columns are as follows:
-  - _datetime_: Date and hour of record
-  - _Ring_: Factor encoding unique ID of bird
-  - _colony_: Factor encoding the colony of provenance for the bird
-  - _col_lat_: Numeric latitude of colony
-  - _col_lon_: Numeric longitude of colony
-  - _att_time_: Number of minutes of hour bird spent at colony
-  - _year_: Factor encoding year of record
-  - _num_visits_: Number of unique visits made by the bird
-  - _time_ID_: Factor encoding time index of bird dataset
-  - _att_poss_: Number of minutes of data recorded for the hourly record
-  - _prop_att_: Numeric proportion of hour bird spent in attendance at colony
-  - _n_flight_: Number of 10 minute flight bouts recorded
-  - _n_rest_: Number of 10 minute rest bouts recorded
-  - _prop_forage_: Proportion of hour bird spent foraging
-  - _rest_flight_ratio_: Ratio of time spent in rest vs flight behaviour
-  - _sun altitude_: Numeric sun altitude, in degrees. Sun altitude is the angular elevation of the center of the solar disk above the horizon
-  - _temp_: Numeric temperature in degrees celsius
-  - _hour_: Numeric value for hour of day; 24-hour format
+- **BLKI_breeding_dates.csv** Provides colony-specific breeding dates used to define behavioural analysis windows. Includes the estimated minimum lay date (min_lay) and the start (min_subset) and end (max_subset) dates for data subsetting.
 
-- **BLKI_gls-daily-behaviour.RData** Dataset summarising daily behaviour for each bird. Data colums are as follows:
-  - _ring_: Factor encoding unique ID of bird
-  - _date_: Date of record
-  - _n_recs24/day/night_: Number of 10 minute bouts per 24hour period/daylight hours/night hours for which data are available (indiviudal columns indicated by '/')
-  - _prop_forage24/day/night_: Proportion of 24 hour period/daylight hours/night hours spent foraging (indiviudal columns indicated by '/'. 'nocol' in column heading indicates that colony attendance excluded from calculation)
-  - _prop_rest24/day/night_: Proportion of 24 hour period/daylight hours/night hours spent resting (indiviudal columns indicated by '/'. 'nocol' in column heading indicates that colony attendance excluded from calculation)
-  - _prop_flight24/day/night_: Proportion of 24 hour period/daylight hours/night hours spent in flight (indiviudal columns indicated by '/'. 'nocol' in column heading indicates that colony attendance excluded from calculation)
-  - _col_att24/day/night_: Proportion of 24 hour period/daylight hours/night hours spent attending the colony (indiviudal columns indicated by '/')
-  - _daylight.mins_: Number of minute of daylight per 24 hour period
-  - _total_imm.day/night_: Total immersion recorded per daylight/night time hours (individual columns indicated by '/')
-  - _colony_: Factor encoding the colony of provenance for the bird
-  - _col_lat_: Numeric latitude of colony
-  - _col_lon_: Numeric longitude of colony
+- **BLKI_example_actograms.csv** Lists one representative individual per colony used to generate example actograms shown in the manuscript. Includes anonymised bird IDs (ring) matched to colony names.
 
-- **BLKI_gls-hourly-behaviour.RData** Dataset summarising hourly daily behaviour for each bird. Data colums are as follows:
-  - _colony_: Factor encoding the colony of provenance for the bird
-  - _ring_: Factor encoding unique ID of bird
-  - _date_: Date of record
+- **BLKI_gls-hourly-behaviour.RData** Dataset summarising hourly daily behaviour for each bird. A .csv alternative is also provided. Data columns are as follows:
+  - _colony_: Factor encoding the colony of origin for the bird
+  - _year_: Year of record
+  - _ring_: Factor encoding unique ID of bird (anonymised)
+  - _col_lat_: Colony latitude
+  - _col_lon_: Colony longitude
+  - _datetime_: Date and time of record rounded to the nearest hour; POSIXct
+  - _date_: Date of the record
   - _hour_: Numeric hour of record
-  - _total_imm_: Numeric total immersion per hour
-  - _n_flight_: Number of 10 minute flight bouts per hour
-  - _n_rest_: Number of 10 minute rest bouts per hour
-  - _n_forage_: Number of 10 minute foraging bouts per hour
-  - _for_poss_: Number of 10 minute bouts for which data are available (maximum = 6).
-  - _prop_forage_: Proportion of hour spent foraging
-  - _rest_flight_ratio_: Ratio of time spent in rest vs flight behaviour
+  - _imm_total_: Numeric total immersion per hour
+  - _activity_mins_: Total number of minutes in the activity state
+  - _bout_dur.mins_: Total duration of the bout (record) in minutes
+  - _sun_altitude_: Solar elevation angle (in degrees) at the recorded local datetime and location. Positive values indicate the sun is above the horizon; negative values indicate it is below the horizon (i.e., night)
+  - _datetime_UTC_: Date and time of the record rounded to the nearest hour and converted to UTC; POSIXct
+  - _hour_UTC_: Numeric hour of record converted to UTC
 
-- **BLKI_gls-trips.RData** Condensed dataset summarising colony attendance or trip records for each bird; used to compare outputs of trips identified via GLS versus GPS data. Each row represents an individual bird record (trip or colony visit). Data columns are as follows:
-  - _ring_: Factor encoding unique ID of bird
-  - _type_: Whether record identified using geolocator (GLS) or GPS data
-  - _start_: Datetime variable (POSIXct) indicating start time of record
-  - _loc_: Whether the record is for a colony visit (colony) or trip to sea (trip)
-  - _end_: Datetime variable (POSIXct) indicating end time of record
-  - _duration_mins_: Duration of record in minutes
-  - _colony_: Factor encoding the colony of provenance for the bird
-  - _col_lat_: Numeric latitude of colony
-  - _col_lon_: Numeric longitude of colony
- 
-- **BLKI_metadata_anon.RData** Abridged dataset giving colony locations of each individual. Each row contains one individual bird. Data columns are as follows:
+- **BLKI_metadata_anon.RData** Abridged dataset giving colony locations of each individual. A .csv alternative is also provided. Each row contains one individual bird. Data columns are as follows:
   - _ring_: Factor encoding unique ID of bird
   - _colony_: Factor encoding the colony of provenance for the bird
   - _col_lat_: Numeric latitude of colony
