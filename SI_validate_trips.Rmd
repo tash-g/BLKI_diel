@@ -1,0 +1,525 @@
+---
+title: "Supplementary Analysis: Validate GLS trips using GPS data"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Define the packages
+packages <- c("ggplot2", "cowplot", "zoo", "dplyr", "lubridate", "magrittr")
+
+# Install packages not yet installed - change lib to library path
+# installed_packages <- packages %in% rownames(installed.packages())
+# 
+# if (any(installed_packages == FALSE)) {
+#  install.packages(packages[!installed_packages])
+# }
+
+# Load packages and functions
+invisible(lapply(packages, library, character.only = TRUE))
+
+#source("BLKI_functions.R")
+
+# Session info ----
+
+# > sessionInfo()
+# R version 4.5.0 (2025-04-11 ucrt)
+# Platform: x86_64-w64-mingw32/x64
+# Running under: Windows 11 x64 (build 26100)
+# 
+# Matrix products: default
+#   LAPACK version 3.12.1
+# 
+# locale:
+# [1] LC_COLLATE=English_United Kingdom.utf8  LC_CTYPE=English_United Kingdom.utf8    LC_MONETARY=English_United Kingdom.utf8
+# [4] LC_NUMERIC=C                            LC_TIME=English_United Kingdom.utf8    
+# 
+# time zone: Europe/London
+# tzcode source: internal
+# 
+# attached base packages:
+# [1] stats     graphics  grDevices utils     datasets  methods   base     
+# 
+# other attached packages:
+# [1] magrittr_2.0.3  lubridate_1.9.4 dplyr_1.1.4     zoo_1.8-14      cowplot_1.1.3   ggplot2_3.5.2  
+# 
+# loaded via a namespace (and not attached):
+#  [1] vctrs_0.6.5        cli_3.6.5          knitr_1.50         rlang_1.1.6        xfun_0.52          generics_0.1.4    
+#  [7] glue_1.8.0         htmltools_0.5.8.1  scales_1.4.0       rmarkdown_2.29     grid_4.5.0         evaluate_1.0.3    
+# [13] tibble_3.3.0       fastmap_1.2.0      yaml_2.3.10        lifecycle_1.0.4    compiler_4.5.0     RColorBrewer_1.1-3
+# [19] pkgconfig_2.0.3    Rcpp_1.0.14        timechange_0.3.0   rstudioapi_0.17.1  farver_2.1.2       lattice_0.22-6    
+# [25] digest_0.6.37      R6_2.6.1           tidyselect_1.2.1   pillar_1.10.2      Matrix_1.7-3       withr_3.0.2       
+# [31] tools_4.5.0        gtable_0.3.6      
+
+```
+
+This script compares trips identified through GPS with those identified using immersion data to determine the best set of parameters for extracting foraging trips from immersion data alone. 
+
+This file is designed to work with the original immersion datasets and non-anonymised GPS data, which are available by request from SEATRACK and/or the authors. As a result it will not run 'out of the box' with the rest of the scripts, and is thus included here only for review and context.
+
+# GPS: Load and process into trips
+
+```{r process_gps_into_trips}
+
+gps_folder <- "Data_workshop/GPS"
+gps_files <- list.files(gps_folder)
+## Remove a bird that never left
+gps_files <- gps_files[!grepl("6234461", gps_files)]
+
+# Load and process each file 
+gps_list <- vector(mode = "list", length = length(gps_files))
+
+for (i in 1:length(gps_files)) {
+  
+  bird <- data.table::fread(file = paste0(gps_folder, "/", gps_files[i]))
+  ring <- strsplit(gps_files[i], "\\W")[[1]][2]
+  
+  ## Clean the data
+  bird %<>% 
+    mutate(datetime = paste(Date, Time),
+           datetime = fasttime::fastPOSIXct(datetime, tz = "UTC")) %>%
+    select(-c(Altitude, Course, Type, Date, Time, Essential, Distance, Speed)) %>%
+    relocate(datetime, .before = Latitude)
+  
+  # Get home coords
+  ## Manually fix one bird (GPS recording period too early)
+  if(ring == "6234122") {
+    bird %<>% filter(datetime >= fasttime::fastPOSIXct("2022-07-08 09:29:28") & datetime <= fasttime::fastPOSIXct("2022-07-13 17:00:41")) }
+  
+  # Calc distance to home 
+  bird$home_lat <- median(bird$Latitude[1:10])
+  bird$home_lon <- median(bird$Longitude[1:10]) 
+  
+  bird$dist_home <- gcd.hf(bird$Longitude, bird$Latitude,   bird$home_lon, bird$home_lat)
+  
+  # Add filename metadata to the lon/lat/date info
+  gps_list[[i]] <- bird
+  gps_list[[i]]$ring <- ring
+  
+  print(i)
+}
+
+alltracks <- data.table::rbindlist(gps_list)
+
+```
+
+### Split GPS data into trips
+
+Using a 1km threshold, and only changing location when the bird persists at either 'trip' or 'colony' for > 50 minutes.
+
+```{r split_gps_into_trips}
+
+alltracks$location <- ifelse(alltracks$dist_home > 1, "trip", "colony")
+
+birds <- unique(alltracks$ring)
+trips_list <- vector(mode = "list", length = length(birds))
+
+for (i in 1:length(birds)) {
+  
+  mydata <- subset(alltracks, ring == birds[[i]]) %>% arrange(datetime)
+  if(nrow(subset(mydata, location == "trip")) < 6) { next }
+ 
+  # Find durations & fix short stints
+  repeat {
+    # Calculate bout durations
+    durs <- rle(mydata$location)$lengths
+    mydata$duration <- rep(durs, durs)
+    
+    # Save current state
+    original <- mydata$location
+    
+    # Flip short bouts
+    ## Trips first
+    mydata$location[mydata$location == "trip" & mydata$duration <= 5] <- "colony"
+    durs <- rle(mydata$location)$lengths
+    mydata$duration <- rep(durs, durs)
+    
+    ## Again with colonies
+    mydata$location[mydata$location == "colony" & mydata$duration <= 5] <- "trip"
+    durs <- rle(mydata$location)$lengths
+    mydata$duration <- rep(durs, durs)
+    
+    # Recalculate durations to check if anything changed
+    if (all(mydata$location == original)) break
+  }
+  
+  # Make a trip ID
+  mydata$tripID <- rep(1:length(durs), durs)
+  
+  # Extract trips
+  last_time <- mydata$datetime[nrow(mydata)]
+  
+  mydata_trips <- mydata %>% 
+    group_by(tripID) %>%
+    arrange(datetime) %>%
+    summarise(ring = ring[1],
+              startdate = datetime[1],
+              location = location[1]) %>%
+    data.frame()
+  
+  ## Find end times
+  last_time <- mydata$datetime[nrow(mydata)]
+  
+  mydata_trips %<>%
+    arrange(startdate) %>%
+    mutate(enddate = lead(startdate),
+           enddate = ifelse(is.na(enddate), as.character(last_time), as.character(enddate)),
+           enddate = fasttime::fastPOSIXct(enddate, tz = "UTC"),
+           tripDur.mins = as.numeric(difftime(enddate, startdate, units = "mins")),
+           tripDur.hours = tripDur.mins / 60) %>%
+    relocate(ring, .before = tripID)
+  
+  trips_list[[i]] <- mydata_trips
+  
+}
+
+gps_trips <- do.call("rbind", trips_list)
+gps_trips %<>% 
+  mutate(type = "GPS") %>%
+  relocate(type, .after = ring)
+
+```
+
+## GLS: Load and process into trips
+
+```{r align_gls_with_gps}
+
+load("Data_workshop/NyAPyr_GLS_processed.RData")
+
+# Make date a posixct variable
+gls$datetime <- as.POSIXct(gls$datetime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
+
+## Align GLS and GPS datasets for proper comparison
+allkits <- unique(gls$ring)
+alignment.list <- vector(mode = "list", length = length(allkits))
+
+for (i in 1:length(allkits)) {
+  
+  mygls <- subset(gls, ring == allkits[i])
+  
+  # Escape when no matching GPS
+  if (nrow(subset(alltracks, ring == allkits[i])) == 0) next
+  
+  # Min and max of GPS tracking dates
+  mn <- min(alltracks$datetime[alltracks$ring == allkits[i]])
+  mx <- max(alltracks$datetime[alltracks$ring == allkits[i]])
+  
+  ## Subset GLS data to tracking dates
+  mygls <- subset(mygls, datetime > mn & datetime < mx)
+  
+  ## Skip GLS that are really short
+  if(nrow(mygls) < 36) next
+  
+  # Output to list
+  alignment.list[[i]] <- mygls
+  
+}
+
+gls <- do.call("rbind", alignment.list)
+
+```
+
+```{r split_gls_into_trips}
+
+# Set varying rolling mean width and threshold immersion parameters ----
+rolling.width <- c(10, 20, 30, 60, 120, 180)
+thresh.immersion <- c(2.5, 5, 10, 15, 20, 25, 30, 40, 50)
+
+glsList <- vector(mode = "list", length = length(rolling.width))
+
+for (r in 1:length(rolling.width)) {
+  
+  gls_rolled <- gls %>% 
+      group_by(ring) %>%
+      # Get rolling mean immersion for each bird
+      mutate(immersion.rolling = rollmean(immersion, rolling.width[r], na.pad = T),
+             rolling.percentage = immersion.rolling/max(immersion.rolling, na.rm = T)*100, 
+             paraID = paste(ring, rolling.width[r], sep = "_"),
+             roll_width = rolling.width[r]) %>%
+      data.frame()
+  
+  glsList[[r]] <- gls_rolled
+  
+}
+
+glsDat <- do.call("rbind", glsList)
+glsDat <- subset(glsDat, !is.na(immersion.rolling))
+
+
+# Label the trips using tripFinder function ----
+
+myKits <- unique(glsDat$paraID)
+tripsList <- list()
+tripsList.labelled <- list()
+
+for (t in 1:length(thresh.immersion)) {
+
+  tripsList.int <- vector(mode = "list", length = length(myKits)) 
+  
+  for (i in 1:length(myKits)) {
+  
+  mydf <- subset(glsDat, paraID == myKits[i])
+  
+  tripsID <- tripFinder(mydf$datetime, 
+                        mydf$immersion, 
+                        mydf$rolling.percentage, 
+                        thresh.immersion[t])
+  
+  mytrips <- data.frame(ring = mydf$ring[1],
+                        type = "GLS",
+                        start = tripsID[,1],
+                        loc = "trip",
+                        end = tripsID[,2])
+  
+  ## Error if no end to trip
+  mytrips <- subset(mytrips, !is.na(end))
+
+  ## Combine trips with short gaps between them
+  mytrips$tripGap <- difftime(lead(mytrips$start), mytrips$end, units = "mins")
+  mytrips$end[as.numeric(mytrips$tripGap) <= 50] <- NA
+  mytrips$end <- na.locf(mytrips$end, fromLast = TRUE)
+  mytrips <- subset(mytrips, !duplicated(end))
+  mytrips$tripGap <- NULL
+
+  ## Add in colony rows
+  myvisits <- data.frame(ring = mydf$ring[1],
+                         type = "GLS",
+                         start = c(mydf$datetime[1], mytrips$end),
+                         loc = "colony",
+                         end = c(mytrips$start, as.character(mydf$datetime[nrow(mydf)])))
+
+  myvisits$start <- as.character(myvisits$start)
+
+  # Combine datasets
+  mytrips <- rbind(mytrips, myvisits)
+  mytrips$start <- fasttime::fastPOSIXct(mytrips$start, tz = "UTC")
+  mytrips$end <- fasttime::fastPOSIXct(mytrips$end, tz = "UTC")
+  mytrips <- mytrips[order(mytrips$start),]
+  mytrips$duration_mins <- difftime(mytrips$end, mytrips$start,
+                                    units = "mins")
+  mytrips <- subset(mytrips, as.numeric(duration_mins) > 0)
+  
+  mytrips$thresh <- thresh.immersion[t]
+  mytrips$roll_width <- mydf$roll_width[1]
+  mytrips$tripID <- 1:nrow(mytrips)
+  
+  # Some reformatting to match GPS
+  mytrips %<>% 
+    rename(location = loc, startdate = start, enddate = end) %>%
+    mutate(tripDur.mins = as.numeric(duration_mins),
+           tripDur.hours = tripDur.mins / 60) %>%
+    select(-duration_mins) %>%
+    relocate(c(tripID, location), .after = type) %>%
+    relocate(c(thresh, roll_width), .after = tripDur.hours)
+  
+  tripsList.int[[i]] <- mytrips
+  
+  }
+ 
+ trips_bound <- do.call("rbind", tripsList.int)
+ tripsList[[t]] <- trips_bound
+ 
+}
+
+gls_trips <- do.call("rbind", tripsList)
+
+```
+
+
+## Combine the datasets
+
+```{r r_combine_gls_gps}
+
+# Isolate GLS for which have GPS data
+gls_trips %<>% mutate(paraID = paste(ring, thresh, roll_width, sep = "_"))
+myKits <- unique(gls_trips$paraID[gls_trips$ring %in% gps_trips$ring])
+matchedGLS_GPS.list <- vector(mode = 'list', length = length(myKits))
+
+for (i in 1:length(myKits)) {
+  
+  # Subset GLS trip dataset
+  gls_trips.sub <- subset(gls_trips, paraID == myKits[i])
+  myring <- gls_trips.sub$ring[1]
+  
+  # # Subset full GLS dataset
+  # glsDat_sub <- subset(gls, paraID == paste0(myring, "_", glsTrips_sub$window)[1])
+  
+  # Subset GPS trip dataset
+  gps_trips.sub <- subset(gps_trips, ring == myring)
+ 
+  # # Subset full GPS data
+  # gpsFull_sub <- subset(gpsFull, ring == myring)
+ 
+  # Escape when no matching GPS
+  if (nrow(gps_trips.sub) == 0) next
+  
+  # Get min and max of GPS data
+  mn <- min(na.omit(gps_trips.sub$startdate))
+  mx <- max(na.omit(gps_trips.sub$enddate))
+  
+  ## Align the datasets 
+  gps_trips.sub %<>% 
+    mutate(thresh = gls_trips.sub$thresh[1], 
+           roll_width = gls_trips.sub$roll_width[1],
+           paraID = gls_trips.sub$paraID[1])
+  
+  # Bind together and output
+  allTrips <- rbind(gps_trips.sub, gls_trips.sub) %>% arrange(startdate)
+  
+  matchedGLS_GPS.list[[i]] <- allTrips
+  
+}
+
+compDat <- do.call("rbind", matchedGLS_GPS.list)
+
+```
+
+## Compare alignment of GPS and GLS-derived trips
+
+```{r compare_trips}
+
+myKits <- unique(compDat$paraID)
+accuracy_list <- vector(mode = "list", length = length(myKits))
+
+for (i in 1:length(myKits)) {
+  
+  print(paste0("Processing ", i, " of ", length(myKits), " (", round(i/length(myKits)*100), "% complete)"))
+  
+  mydf <- subset(compDat, paraID == myKits[[i]])
+  
+  # Give each trip an ID
+  mydf %<>% mutate(tripID = paste(type, tripID, sep = "_"))
+  
+  # Get number of trips and mean duration by type
+  trip_summary <- mydf %>% group_by(type) %>%
+    summarise(no_trips = sum(location == "trip"),
+              mean_duration = mean(tripDur.mins[location == "trip"])) %>%
+    data.frame()
+  
+  trip_summary$threshold <- mydf$thresh[1]
+  trip_summary$rollWidth <- mydf$roll_width[1]
+  trip_summary$ring <- mydf$ring[1]
+  trip_summary$tripDiff <- trip_summary$no_trips[1] - trip_summary$no_trips[2]
+  trip_summary$durDiff <- trip_summary$mean_duration[1] - trip_summary$mean_duration[2]
+  
+  trip_summary <- trip_summary[1,]
+  
+  # Interpolate times (the slow bit)
+  all_int <- mydf %>%
+    group_by(tripID) %>%
+     do(data.frame(ring = .$ring,
+                   type = .$type,
+                   location = .$location,
+                   time = seq(.$startdate,.$enddate,by = 60)))
+
+  # Get times to nearest minute
+  all_int$time <- round(all_int$time, "mins")
+  all_int$tripID <- NULL
+  
+  # Make dataframe wide
+  all.int_GPS <- all_int %>% filter(type == "GPS") %>% rename(type_GPS = type, loc_GPS = location)
+  all.int_GLS <- all_int %>% filter(type == "GLS") %>% rename(type_GLS = type, loc_GLS = location)
+
+  all.comp <- merge(all.int_GLS, all.int_GPS, by = c("ring", "time"), all.x = T)
+  all.comp %<>% filter(!is.na(type_GPS)) %>% mutate(threshold = mydf$thresh[1], window = mydf$roll_width[1])
+  
+  ## Quantify accuracy of trip designation
+  incorrect <- nrow(subset(all.comp, loc_GLS != loc_GPS))
+  correct <- nrow(subset(all.comp, loc_GLS == loc_GPS))
+  accuracy <- correct/(incorrect + correct)*100
+  
+  # Add to trip summary df
+  trip_summary$accuracy <- accuracy
+  accuracy_list[[i]] <- trip_summary
+  
+}
+
+accuracy.df <- do.call("rbind", accuracy_list)
+
+save(accuracy.df, file = "Data_outputs/SI_accuracy_data.RData")
+
+```
+
+```{r summarise_comparison}
+
+load("Data_outputs/SI_accuracy_data.RData")
+
+# Get mean values for each threshold and rolling width 
+accuracy.summary <- accuracy.df %>% 
+  group_by(threshold, rollWidth) %>%
+  summarise(tripDiff.mean = mean(tripDiff, na.rm = T),
+            durDiff.mean = mean(durDiff, na.rm = T),
+            accuracy.mean = mean(accuracy),
+            accuracy.sd = sd(accuracy)) %>%
+  data.frame()
+
+## Build the plots
+acc.plot <- ggplot(data = accuracy.summary, 
+                   aes(x = threshold, y = accuracy.mean, 
+                   group = as.factor(rollWidth), col = as.factor(rollWidth))) +
+  geom_point() +
+  geom_line() +
+  labs(y = "Total accuracy (%)", tag = "(A)") +
+  scale_color_viridis_d(name = "Rolling width") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = c(0.8, 0.15),
+        legend.background = element_rect(fill = "transparent"),
+        legend.key.size = unit(0.5, "cm"),
+        legend.key = element_blank(), 
+        legend.spacing = unit(0, "cm"),
+        legend.text = element_text(size = 8)) +
+  guides(color = guide_legend(nrow = 2, byrow = TRUE))
+
+no.plot <- ggplot(data = accuracy.summary, aes(x = threshold, y = abs(tripDiff.mean), 
+           group = as.factor(rollWidth), col = as.factor(rollWidth))) +
+  geom_point() +
+  geom_line() +
+  labs(y = "Absolute mean trip number GLS - GPS", tag = "(B)") +
+  scale_color_viridis_d() +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+
+dur.plot <- ggplot(data = accuracy.summary, aes(x = threshold, y = abs(durDiff.mean), 
+            group = as.factor(rollWidth), col = as.factor(rollWidth))) +
+  geom_point() +
+  geom_line() +
+  labs(y = "Absolute mean duraton GLS - GPS", x = "Immersion threshold", tag = "(C)") +
+  scale_color_viridis_d() +
+  theme_bw() +
+  theme(legend.position = "none")
+
+# Accuracy for chosen parameters ----
+
+accuracy.df_chosen <- subset(accuracy.df, threshold == 5.0 & rollWidth == 20)
+mean(accuracy.df_chosen$accuracy)
+sd(accuracy.df_chosen$accuracy)
+
+```
+
+
+#### Figure S3: Plot of comparison metrics
+
+The best support is for a rolling window of 20 and threshold of 5/10.
+
+```{r FIGURE_S3}
+
+png("Figures/FigureS3_GLS_GPS_comparison.png", width = 12, height = 20, units = "cm", res = 600)
+ggpubr::ggarrange(acc.plot, no.plot, dur.plot, 
+                  ncol = 1,
+                  align = "v")
+dev.off()
+
+```
