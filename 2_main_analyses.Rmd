@@ -469,11 +469,11 @@ dev.off()
 
 ```
 
-#### Figure S4: Probability of significant period with colony latitude
+#### Figure S5: Probability of significant period with colony latitude
 
 *"First, we used a generalised linear mixed effects model (GLMM) with a binomial distribution to test whether the probability that individuals exhibit significant periods depended on colony latitude."*
 
-```{r FIGURE_S4, eval = save_plot}
+```{r FIGURE_S5, eval = save_plot}
 
 effects.signif <- data.frame(ggeffects::ggpredict(signif_glmm.ind, terms = "col_lat")) %>% 
   dplyr::rename(col_lat = x)
@@ -490,7 +490,7 @@ plot.signif <- ggplot() +
   scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
   BLKI_theme
 
-png(file = "Figures/FigureS4_prop_signif_periods.png", width = 9, height = 7, units = "in", res = 600)
+png(file = "Figures/FigureS5_prop_signif_periods.png", width = 9, height = 7, units = "in", res = 600)
 plot.signif
 dev.off()
 
@@ -575,11 +575,11 @@ for (i in 1:length(colonies)) {
 
 ```
 
-#### Figure S6: Immersion trends by colony
+#### Figure S7: Immersion trends by colony
 
-```{r FIGURE_S6, eval = save_plot}
+```{r FIGURE_S7, eval = save_plot}
 
-png("Figures/FigureS6_immersion_by_colony.png", 
+png("Figures/FigureS7_immersion_by_colony.png", 
     width = 25, height = 20, units = "in", res = 650)
 cowplot::plot_grid(plotlist = plot_list.pop, nrow = 4, align = "hv",
                    ncol = 6)
@@ -690,11 +690,10 @@ for (i in 1:length(colonies)) {
 
 ```
 
-#### Figure S7: Individual ACFs
+#### Figure S8: Individual ACFs
 
-```{r FIGURE_S7, eval = save_plot}
-
-png("Figures/FigureS7_individual_imm_ACF.png", 
+```{r FIGURE_S8, eval = save_plot}
+png("Figures/FigureS8_individual_imm_ACF.png", 
     width = 25, height = 20, units = "in", res = 600)
 cowplot::plot_grid(plotlist = plot_list.ind, nrow = 4, align = "hv",
                    ncol = 6)
@@ -733,9 +732,9 @@ summary(period_glm.all)
 
 ```
 
-#### Figure 3 & S8: Absolute deviation by colony
+#### Figure 3 & S9: Absolute deviation by colony
 
-```{r FIGURE_3_S8}
+```{r FIGURE_3_S9}
 
 # Get effects
 period_glmm_signif.df <- data.frame(ggpredict(period_glm.signif, terms = "col_lat")) %>%
@@ -779,7 +778,7 @@ png(file = "Figures/Figure3_period_length.png", width = 9, height = 7, units = "
 period_glmm_signif.plot
 dev.off()
 
-png(file = "Figures/FigureS8_period_length.png", width = 9, height = 7, units = "in", res = 600)
+png(file = "Figures/FigureS9_period_length.png", width = 9, height = 7, units = "in", res = 600)
 period_glmm_all.plot
 dev.off()
 
@@ -908,9 +907,9 @@ save(edf_results, file = "Data_outputs/gam_edf_results.RData")
 
 ```
 
-#### Figure S9
+#### Figure S10
 
-```{r FIGURE_S9, eval = save_plot}
+```{r FIGURE_S10, eval = save_plot}
 
 load("Data_outputs/GAM_activity_sun.RData")
 load("Data_outputs/subsampled_kits.RData")
@@ -946,7 +945,7 @@ pred_grid$col_lat_f <- factor(round(pred_grid$col_lat, 2))
 
 # Plot
 
-png("Figures/FigureS9_GAM_activity_by_sun.png", 
+png("Figures/FigureS10_GAM_activity_by_sun.png", 
     width = 9, height = 7, units = "in", res = 600)
 ggplot(pred_grid, aes(x = sun_altitude, y = predicted, color = col_lat, group = col_lat)) +
   geom_line(size = 1.2, alpha = 0.5) +
@@ -961,9 +960,9 @@ dev.off()
 ```
 
 
-#### Figure S10
+#### Figure S11
 
-```{r FIGURE_S10_sun_elevation_randomisation_output, eval = save_plot}
+```{r FIGURE_S11_sun_elevation_randomisation_output, eval = save_plot}
 
 load("Data_outputs/GAM_activity_sun.RData")
 load("Data_outputs/gam_edf_results.RData")
@@ -984,7 +983,7 @@ te_plot <- ggplot(edf_results, aes(x = te_edf)) +
   labs(x = "EDF of sun elevation × latitude smooth", y = "Count") +
   BLKI_theme
 
-png("Figures/FigureS10_GAM_randomisation_output.png", 
+png("Figures/FigureS11_GAM_randomisation_output.png", 
     width = 9, height = 7, units = "in", res = 600)
 te_plot
 dev.off()

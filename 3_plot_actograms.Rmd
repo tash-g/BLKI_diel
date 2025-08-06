@@ -194,9 +194,11 @@ for(i in 1:length(Acto_list)){
 
 # Plot representative birds
 
+#### Figure S6
+
 These birds were selected for the manuscript as they had a substantial dataset with few gaps over the relevant period of time.
 
-```{r plot_representative_birds}
+```{r FigureS6_plot_representative_birds}
 
 # Set all to the same dates for comparison
 min_date <- as_day_month(format(min(breeding_dates$min_subset), "%d-%m"))
@@ -299,11 +301,11 @@ multiPlot2 <- cowplot::plot_grid(get(acto_name.df$acto_name.df[13])+ theme(axis.
                         align = c("hv"))
 
 
-png(paste0(actograms.path, "FigureS5_actograms_1.png"), width = 14, height = 9, units = "in", res = 600)
+png(paste0(actograms.path, "FigureS6_actograms_1.png"), width = 14, height = 9, units = "in", res = 600)
 multiPlot1
 dev.off()
 
-png(paste0(actograms.path, "FigureS5_actograms_2.png"), width = 14, height = 9, units = "in", res = 600)
+png(paste0(actograms.path, "FigureS6_actograms_2.png"), width = 14, height = 9, units = "in", res = 600)
 multiPlot2
 dev.off()
 

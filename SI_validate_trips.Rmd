@@ -510,13 +510,13 @@ sd(accuracy.df_chosen$accuracy)
 ```
 
 
-#### Figure S3: Plot of comparison metrics
+#### Figure S4: Plot of comparison metrics
 
 The best support is for a rolling window of 20 and threshold of 5/10.
 
-```{r FIGURE_S3}
+```{r FIGURE_S4}
 
-png("Figures/FigureS3_GLS_GPS_comparison.png", width = 12, height = 20, units = "cm", res = 600)
+png("Figures/FigureS4_GLS_GPS_comparison.png", width = 12, height = 20, units = "cm", res = 600)
 ggpubr::ggarrange(acc.plot, no.plot, dur.plot, 
                   ncol = 1,
                   align = "v")
