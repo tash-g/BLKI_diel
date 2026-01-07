@@ -4,23 +4,6 @@ Natasha Gillies, Sébastien Descamps, Nicholas P. Huffeldt, Frederick McKendrick
 ## Overview
 This repository contains scripts and data to recreate the main results and figures of this paper (currently in submission). Analyses have been tested in R version 4.3.2 (2023-10-31 ucrt). Individual packages are listed under the 'Session Info' of each R Markdown file.
 
-This repository uses **Git Large File Storage (LFS)** to manage large data files. If you have not used Git LFS before, you will ll need to install and configure it before cloning or pulling this repository.  
-To clone with full LFS support, run the following commands:
-
-```bash
-# 1. Install Git LFS 
-git lfs install
-
-# 2. Clone the repository 
-git clone https://github.com/tash-g/BLKI_diel.git
-
-# 3. Fetch and checkout the LFS files
-cd BLKI_diel
-git lfs pull
-```
-
-For users who are unable to use GitHub LFS, the data are separately hosted on Figshare [here](https://doi.org/10.6084/m9.figshare.31018132).
-
 ## Scripts
 A short description of each script is given below. All files are provided as R markdown documents to aid interpretation and reproducibility. Note that the raw geolocator/salt-water immersion data are provided by the [SEATRACK](https://seapop.no/en/seatrack/) project and so are not shared here. Those interested in using these data should contact the authors/SEATRACK for further information.
 
@@ -33,6 +16,8 @@ A short description of each script is given below. All files are provided as R m
 ## Data inputs
 
 These data are used in the above scripts. Note that all Rings/identities have been recoded and so cannot be linked to existing datasets. Please contact the authors if you would like to make use of these datasets, as we may be able to offer additional information, data, or advice. 
+
+Please note that the main analysis file, `BLKI_gls-hourly-behaviour.RData`, is very large and is thus only hosted as an RData file here. For those unable to access RData files, the dataset is separately hosted on Figshare [here](https://doi.org/10.6084/m9.figshare.31018132) in CSV format for easier access.
 
 - **BLKI_breeding_dates.csv** Provides colony-specific breeding dates used to define behavioural analysis windows. Includes the estimated minimum lay date (min_lay) and the start (min_subset) and end (max_subset) dates for data subsetting.
 
