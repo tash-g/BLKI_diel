@@ -75,7 +75,7 @@ This file is designed to work with the original immersion datasets and the non-a
 
 # Set parameters for trip identification
 rolling.width <- 20
-thresh.immersion <- 5 #15
+thresh.immersion <- 5
 
 # Load datasets
 ## Huge amount of data - so loop through previously subsetted files individually
@@ -210,9 +210,11 @@ for (i in 1:length(gls_files)) {
       mutate(datetime = as.POSIXct(paste(date, format(strptime(hour, format = "%H"), "%H:%M:%S", tz = "UTC")))) %>%
       data.frame() %>%
       rename(mins_att = n) %>%
+      ungroup() %>%
       arrange(datetime) %>%
       mutate(year = year(datetime))
     
+    ## Get actual duration of each bout 
     total.dur <- mytrips %>% 
       distinct() %>%
       mutate(time = map2(start, end, seq, by = "min")) %>%
@@ -221,19 +223,29 @@ for (i in 1:length(gls_files)) {
              hour = hour(time)) %>%
       mutate(datetime = as.POSIXct(paste(date, sprintf("%02d:00:00", hour)), tz = "UTC")) %>%
       group_by(date, hour) %>%
-      summarise(total_duration = n(), .groups = "drop")
+      summarise(bout_dur = n(), .groups = "drop")
     
-    ## Set trip attendance values to inverse
-    att.df$mins_att[att.df$loc == "trip"] <- 60 - att.df$mins_att[att.df$loc == "trip"]
-    
-    ## Where duplicates, remove the trip value
     att.df <- att.df[!duplicated(att.df[c("ring","datetime")]),]
     att.df <- merge(att.df, total.dur, by = c("date", "hour"), all.x = T)
+    
+    ## Get actual attendance by setting trip attendance values to inverse
+    att.df %<>% mutate(mins_att = ifelse(loc == "trip", bout_dur - mins_att, mins_att))
+    #att.df$mins_att[att.df$loc == "trip"] <- 60 - att.df$mins_att[att.df$loc == "trip"]
+    
+    ## Calc proportion attendance
+    att.df$prop_att <- att.df$mins_att/att.df$bout_dur
+    
+    
+    ## Where duplicates, remove the trip value
+    #att.df <- att.df[!duplicated(att.df[c("ring","datetime")]),]
+    #att.df <- merge(att.df, total.dur, by = c("date", "hour"), all.x = T)
+    #att.df$prop_att <- att.df$mins_att/att.df$total_duration
     
     # Get activity per hour #
     mydf$hour <- format(mydf$datetime, "%H")
     mydf$date <- as.Date(mydf$datetime)
     
+    # Get hourly behaviour
     hourly_behaviour <- mydf %>% 
       group_by(colony, ring, date, hour, col_lat, col_lon) %>%
       dplyr::summarise(imm.total = sum(immersion),
@@ -249,13 +261,13 @@ for (i in 1:length(gls_files)) {
     
     ## Merge with attendance
     hourly_behaviour <- merge(hourly_behaviour, att.df %>% select(c(date, hour, prop_att)),
-                              by = c("date", "hour"), all.x = T)
+                              by = c("date", "hour"), all.x = T) 
     
+    ## Remove time spent at colony from activity minutes
     hourly_behaviour %<>%
-      mutate(activity.mins = round(activity.mins - 60*prop_att),
-             activity.mins = ifelse(activity.mins < 0, 0, activity.mins),
-             activity.mins = round(activity.mins/ 10) * 10)
-    
+      mutate(activity.mins = activity.mins - bout_dur.mins * prop_att,
+             activity.mins = pmax(0, round(activity.mins / 10) * 10))
+
     # Get sun elevation
   
     ## Convert time to local
@@ -276,8 +288,8 @@ for (i in 1:length(gls_files)) {
     
     ## Clean up dataset ---------------------------------------------------------
 
-    # Ensure birds have at least 60 hours of data (lag time used for analysis)
-    if(nrow(hourly_behaviour) < 60) next 
+    # Ensure birds have at least 72 hours of data (lag time used for analysis)
+    if(nrow(hourly_behaviour) < 72) next 
     
     hourly_behaviour %<>% 
       arrange(datetime) %>% 
@@ -301,10 +313,7 @@ close(pb)
 gls_hourly <- data.table::rbindlist(gls_hourly_behaviour.list)
 
 # Output the data
-
-write.csv(gls_hourly, 
-     file = "Data_inputs/BLKI_gls-hourly-behaviour.RData", 
-     row.names = F)
+save(gls_hourly, file = "Data_inputs/BLKI_gls-hourly-behaviour.RData")
 
 ```
 

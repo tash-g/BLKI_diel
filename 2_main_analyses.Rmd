@@ -102,12 +102,17 @@ manuscript.
 ```{r load_main_dataset}
 
 load("Data_inputs/BLKI_gls-hourly-behaviour.RData")
+
+# If loading from csv:
+# gls_hourly <- read.csv("Data_inputs/BLKI_gls-hourly-behaviour.csv")
+
 gls_hourly %>% 
   summarise(n_colonies = n_distinct(colony),
             n_rings = n_distinct(ring),
             year_min = min(year), 
             year_max = max(year))
 
+# Small changes to colony names
 gls_hourly$colony[gls_hourly$colony == "Sklinna"] <- "Sør-Gjæslingan"
 gls_hourly$colony[gls_hourly$colony == "Witless Bay"] <- "Gull Island, Witless Bay"
 
@@ -219,32 +224,10 @@ dev.off()
 ```
 
 
-# Latitudinal variation in rhythmicity and period
+# *Estimation of individual diel rhythms*
 
-The analyses in this section rely primarily on immersion data because it provides a continuous, relatively noise-free proxy for time spent on water, which reflects behaviour relevant to circadian rhythms. 
-
-## Individual periods
-
-Code to produce the example actograms (Figures Sx and Sx) is included
-separately in the file '3_plot_actograms.Rmd'.
-
-*A note on the periodograms code*: Lomb-Scargle Periodogram analyses
-handles NAs, but the input data must be a two column dataframe with date
-and variable of interest. To capture a rhythm at least double the period
-length is needed. For 24 h rhythm that means a minimum of 48 h of
-sampling. Also, at minimum, the sampling frequency has to be half the
-rate or higher (more frequent) than the period of the rhythm (i.e. for a
-24 h rhythm, sampling has to be at least every 12 h).
-
-Read the documentation for `lsp` and `randlsp`. `randlsp` can take a
-long time to run if many data are included in a dataframe. `lsp` works
-well and is a fine alternative for large datasets. Periodicities don't
-change much, but p values are more precise with `randlsp`.
-
-In the below code I have 'to = 48' because the input data have a
-sampling fequency of 1 h, and I'm interested in perdiocities up to 48 h.
-If your data are collected at a higher or lower frequency this needs to
-be adjusted accordingly
+## *A note on the periodograms code*
+Lomb-Scargle Periodogram analyses handles NAs, but the input data must be a two column dataframe with date and variable of interest. To capture a rhythm at least double the period length is needed. For 24 h rhythm that means a minimum of 48 h of sampling. Also, at minimum, the sampling frequency has to be half the rate or higher (more frequent) than the period of the rhythm (i.e. for a 24 h rhythm, sampling has to be at least every 12 h).
 
 #### Table S3
 
@@ -288,11 +271,11 @@ write.csv(table_s3, file = "Data_outputs/table_s3.csv", row.names = F)
 
 ```
 
-*"We used the R package lomb (Ruf 1999) to estimate individual periods by applying the Lomb-Scargle periodogram method, which is effective for detecting weak periodic components in unevenly sampled time series."*
 
 ```{r individual_periodograms, eval = FALSE}
 
 gls_hourly %<>% mutate(date = as.Date(datetime))
+gls_hourly %<>% filter(!is.na(imm.total))
 
 # Split dataframe by ID
 acc_List <- split(gls_hourly, gls_hourly$ringYr)
@@ -322,10 +305,9 @@ for(i in 1:length(acc_List)){
 	
   # Subset dataframe to include only two relevant columns, NAs OK
   TS <- acc_List[[i]][,c("datetime","imm.total")]
-  TS$time_days <- as.numeric(difftime(TS$datetime, min(TS$datetime), units = "days"))
-  res_lsp <- lsp(repeats = 1000, TS$time_days, TS$imm.total, to = 48, type = "period", ofac = 5, plot = F)
+  res_lsp <- lsp(repeats = 1000, TS$imm.total, to = 48, type = "period", ofac = 5, plot = F)
   
-  # run loop through results to obtain the frequency with highest peak/test statistic and the associated test statistic and p value
+  # Run loop through results to obtain the frequency with highest peak/test statistic and the associated test statistic and p value
 
   DF_lsp_summary <- as.data.frame(summary(res_lsp))
     
@@ -339,14 +321,15 @@ for(i in 1:length(acc_List)){
 
 close(pb)
 
-save(DF_lsp, file = "Data_outputs/individual_periodograms_with_time.RData")
+save(DF_lsp, file = "Data_outputs/individual_periodograms_imm.RData")
+
 
 ```
 
 ```{r summarise_individual_periodograms}
 
 ## Integrate meta to get colonies
-load("Data_outputs/individual_periodograms.RData")
+load("Data_outputs/individual_periodograms_imm.RData")
 load("Data_inputs/BLKI_metadata_anon.RData")
 
 DF_lsp$ring <- DF_lsp$ID %>% strsplit("_") %>% sapply("[", 1)
@@ -469,34 +452,7 @@ dev.off()
 
 ```
 
-#### Figure S5: Probability of significant period with colony latitude
-
-*"First, we used a generalised linear mixed effects model (GLMM) with a binomial distribution to test whether the probability that individuals exhibit significant periods depended on colony latitude."*
-
-```{r FIGURE_S5, eval = save_plot}
-
-effects.signif <- data.frame(ggeffects::ggpredict(signif_glmm.ind, terms = "col_lat")) %>% 
-  dplyr::rename(col_lat = x)
-
-plot.signif <- ggplot() +
-  geom_point(data = signif_period, aes(x = col_lat, y = prop_signif),
-             col = "grey50") +
-  geom_line(data = effects.signif, aes(x = col_lat, y = predicted),
-            linewidth = 1, col = "magenta4") +
-  geom_ribbon(data = effects.signif, aes(x = col_lat, ymin = conf.low, ymax = conf.high),
-              alpha = 0.5, fill = "grey") + 
-  labs(y = "Proportion of birds with significant period lengths",
-       x = "Colony latitude °N") +
-  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
-  BLKI_theme
-
-png(file = "Figures/FigureS5_prop_signif_periods.png", width = 9, height = 7, units = "in", res = 600)
-plot.signif
-dev.off()
-
-```
-
-## Colony-level periodicity
+#### Figure 3: Immersion trends by colony
 
 ```{r visualise_colony_immersion_patterns}
 
@@ -575,11 +531,9 @@ for (i in 1:length(colonies)) {
 
 ```
 
-#### Figure S7: Immersion trends by colony
+```{r FIGURE_3, eval = save_plot}
 
-```{r FIGURE_S7, eval = save_plot}
-
-png("Figures/FigureS7_immersion_by_colony.png", 
+png("Figures/Figure3_immersion_by_colony.png", 
     width = 25, height = 20, units = "in", res = 650)
 cowplot::plot_grid(plotlist = plot_list.pop, nrow = 4, align = "hv",
                    ncol = 6)
@@ -588,11 +542,41 @@ dev.off()
 ```
 
 
-## Variation in individual rhythms (by ACF)
 
-*"Next, we fitted autocorrelation functions to examine the strength of colony-level rhythmicity. Functions were fitted to each individual, and the results aggregated across each colony."*
 
-```{r individual_rhythms}
+# *Latitudinal patterns in rhythmicity*
+
+## Significant periods with latitude
+
+#### Figure S7: Probability of significant period with colony latitude
+
+```{r FIGURE_S7, eval = save_plot}
+
+effects.signif <- data.frame(ggeffects::ggpredict(signif_glmm.ind, terms = "col_lat")) %>% 
+  dplyr::rename(col_lat = x)
+
+plot.signif <- ggplot() +
+  geom_point(data = signif_period, aes(x = col_lat, y = prop_signif),
+             col = "grey50") +
+  geom_line(data = effects.signif, aes(x = col_lat, y = predicted),
+            linewidth = 1, col = "magenta4") +
+  geom_ribbon(data = effects.signif, aes(x = col_lat, ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") + 
+  labs(y = "Proportion of birds with significant period lengths",
+       x = "Colony latitude °N") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme
+
+png(file = "Figures/FigureS5_prop_signif_periods.png", width = 9, height = 7, units = "in", res = 600)
+plot.signif
+dev.off()
+
+```
+
+
+## Calculate individual ACFs 
+
+```{r strength_of_individual_rhythms}
 
 # Find length of time series for each nest
 gls_hourly %<>% mutate(ringYr = paste(ring, year, sep = "_"))
@@ -690,9 +674,9 @@ for (i in 1:length(colonies)) {
 
 ```
 
-#### Figure S8: Individual ACFs
+#### Figure S6: Individual ACFs
 
-```{r FIGURE_S8, eval = save_plot}
+```{r FIGURE_S6, eval = save_plot}
 png("Figures/FigureS8_individual_imm_ACF.png", 
     width = 25, height = 20, units = "in", res = 600)
 cowplot::plot_grid(plotlist = plot_list.ind, nrow = 4, align = "hv",
@@ -702,8 +686,6 @@ dev.off()
 ```
 
 ## Deviations in period length from 12, 24, 48 hours
-
-*"Second, we fitted a GLMM with a gamma distribution to examine the effect of colony latitude on absolute deviation from a 24-hour period."*
 
 ```{r deviation_by_lat}
 
@@ -732,63 +714,7 @@ summary(period_glm.all)
 
 ```
 
-#### Figure 3 & S9: Absolute deviation by colony
-
-```{r FIGURE_3_S9}
-
-# Get effects
-period_glmm_signif.df <- data.frame(ggpredict(period_glm.signif, terms = "col_lat")) %>%
-  dplyr::rename(col_lat = x)
-period_glmm_all.df <- data.frame(ggpredict(period_glm.all, terms = "col_lat")) %>%
-  dplyr::rename(col_lat = x)
-
-# Build the plots
-period_glmm_signif.plot <- ggplot() +
-  geom_point(data = signif_lsp, aes(x = col_lat, y = deviation), 
-             position = position_jitter(width = 0.25),
-             colour = "grey50") +
-  geom_ribbon(data = period_glmm_signif.df, aes(y = predicted, x = col_lat,
-                                               ymin = conf.low, ymax = conf.high),
-              alpha = 0.5, fill = "grey") +
-  geom_line(data = period_glmm_signif.df, aes(y = predicted, x = col_lat),
-            linewidth = 1, col = "magenta4") +
-  labs(x = expression("Colony latitude °N"), y = "Absolute deviation from 12-, 24-, and 48-hour periods",
-       caption = "") +
-  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
-  BLKI_theme
-
-## All birds ##
-period_glmm_all.plot <- ggplot() +
-  geom_point(data = DF_lsp, aes(x = col_lat, y = deviation), 
-             position = position_jitter(width = 0.25),
-             colour = "grey50") +
-  geom_ribbon(data = period_glmm_all.df, aes(y = predicted, x = col_lat,
-                                               ymin = conf.low, ymax = conf.high),
-              alpha = 0.5, fill = "grey") +
-  geom_line(data = period_glmm_all.df, aes(y = predicted, x = col_lat),
-            linewidth = 1, col = "magenta4") +
-  labs(x = expression("Colony latitude °N"), y = "Absolute deviation from 12-, 24-, or 48-hour period",
-       caption = "") +
-  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
-  BLKI_theme
-
-
-# Save plots
-png(file = "Figures/Figure3_period_length.png", width = 9, height = 7, units = "in", res = 600)
-period_glmm_signif.plot
-dev.off()
-
-png(file = "Figures/FigureS9_period_length.png", width = 9, height = 7, units = "in", res = 600)
-period_glmm_all.plot
-dev.off()
-
-
-```
-
-
-### Peak lag and strength as a function of latitude
-
-*"Following previously established methods (Levine et al. 2002; Huffeldt and Merkel 2016), we quantified the strength of rhythmicity by calculating peak strength, which is the difference in correlation value between first peak and first trough in the autocorrelation function."*
+## Peak lag and strength as a function of latitude
 
 ```{r calc_peak_strength}
 
@@ -806,6 +732,84 @@ median(peak_strengths$peak_strength)
 n_distinct(peak_strengths$ring)
 
 ```
+
+#### Figure 4: Absolute deviation & strength by colony
+
+```{r FIGURE_4_S8}
+
+# Get effects
+period_glmm_signif.df <- data.frame(ggpredict(period_glm.signif, terms = "col_lat")) %>%
+  dplyr::rename(col_lat = x)
+period_glmm_all.df <- data.frame(ggpredict(period_glm.all, terms = "col_lat")) %>%
+  dplyr::rename(col_lat = x)
+
+
+# Build the main text plots
+
+## Deviations ~ latitude 
+period_glmm_signif.plot <- ggplot() +
+  geom_point(data = signif_lsp, aes(x = col_lat, y = deviation), 
+             position = position_jitter(width = 0.25),
+             colour = "grey50") +
+  geom_ribbon(data = period_glmm_signif.df, aes(y = predicted, x = col_lat,
+                                               ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") +
+  geom_line(data = period_glmm_signif.df, aes(y = predicted, x = col_lat),
+            linewidth = 1, col = "magenta4") +
+  labs(x = expression("Colony latitude °N"), y = "Absolute deviation from 12-, 24-, and 48-hour periods", tag = "(A)") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme
+
+##  Strength ~ latitude 
+peak_strength.lmm.df <- data.frame(ggpredict(peak_strength.lmm, terms = "col_lat")) %>% 
+  dplyr::rename(col_lat = x) 
+
+peak_strength.lmm.plot <- ggplot() +
+  geom_jitter(data = peak_strengths, aes(x = col_lat, y = peak_strength), 
+              col = "grey50", alpha = 0.5,  width = 0.3, height = 0) +
+  scale_colour_viridis_d() +  
+  geom_ribbon(data = peak_strength.lmm.df, aes(y = predicted, x = col_lat,
+                                              ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") +
+  geom_line(data = peak_strength.lmm.df, aes(y = predicted, x = col_lat),
+            linewidth = 1, col = "magenta4") +
+  labs(x = expression("Colony latitude °N"), y = "Peak strength", tag = "(B)") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme +
+  theme(legend.position = "none")
+
+# Save plots
+png(file = "Figures/Figure4_period_strength_dev.png", width = 19, height = 9, units = "in", res = 600)
+ggpubr::ggarrange(period_glmm_signif.plot, peak_strength.lmm.plot, nrow = 1,
+                  widths = c(1, 1), align = "hv")
+dev.off()
+
+
+
+
+## Supplementary: Deviations periods ~ latitude 
+period_glmm_all.plot <- ggplot() +
+  geom_point(data = DF_lsp, aes(x = col_lat, y = deviation), 
+             position = position_jitter(width = 0.25),
+             colour = "grey50") +
+  geom_ribbon(data = period_glmm_all.df, aes(y = predicted, x = col_lat,
+                                               ymin = conf.low, ymax = conf.high),
+              alpha = 0.5, fill = "grey") +
+  geom_line(data = period_glmm_all.df, aes(y = predicted, x = col_lat),
+            linewidth = 1, col = "magenta4") +
+  labs(x = expression("Colony latitude °N"), y = "Absolute deviation from 12-, 24-, or 48-hour period",
+       caption = "") +
+  scale_x_continuous(breaks = seq(45, 80, by = 5)) + 
+  BLKI_theme
+
+
+png(file = "Figures/FigureS8_period_length.png", width = 9, height = 7, units = "in", res = 600)
+period_glmm_all.plot
+dev.off()
+
+
+```
+
 
 #### Figure 4: Peak ACF strength by latitude
 
@@ -836,8 +840,9 @@ dev.off()
 
 ```
 
+# *Behavioural organisation across the diel cycle*
 
-# Sun elevation as a driver of rhythms
+## Sun elevation GAM
 
 ```{r sun_elevation_initial_random_sampling, eval = FALSE}
 
@@ -907,7 +912,7 @@ save(edf_results, file = "Data_outputs/gam_edf_results.RData")
 
 ```
 
-#### Figure S10
+#### Figure S10: Activity by sun elevation
 
 ```{r FIGURE_S10, eval = save_plot}
 
@@ -960,7 +965,7 @@ dev.off()
 ```
 
 
-#### Figure S11
+#### Figure S11: Sun elevation randomisation output
 
 ```{r FIGURE_S11_sun_elevation_randomisation_output, eval = save_plot}
 
@@ -990,30 +995,8 @@ dev.off()
 
 ```
 
-# Latitudinal variation in behaviour
+## Activity by time of day and latitude
 
-Is there evidence that activity varies with time of day, and that this
-daily pattern changes with latitude? Specifically, is there a dawn/dusk
-peak at low latitudes that flattens at high latitudes?
-
-We fitted a generalized additive mixed model (GAMM) using a tensor
-product smooth (`t2`) to capture the joint effect of hour of day and
-colony latitude on activity (binomial response, active/inactive). The
-model included a random effect of ring ID to account for repeated
-measures. To test whether the timing of activity varied with latitude,
-we compared two GAM structures:
-
-1.  An additive model with separate smooth terms for time of day (hour,
-    modeled cyclically) and colony latitude.
-
-2.  An interaction model employing a tensor product smooth between hour
-    (cyclic cubic spline) and latitude (thin plate spline), allowing the
-    effect of time to vary flexibly with latitude.
-
-Models were fitted using the `bam` function from the `mgcv` package with
-fast restricted maximum likelihood (fREML) estimation for computational
-efficiency. Model comparison was conducted via AIC and likelihood ratio
-tests.
 
 ```{r visualise_latitudinal_variation_behaviour}
 

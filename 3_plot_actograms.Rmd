@@ -83,6 +83,10 @@ actograms.path <- "./Figures/Actograms/"
 # Load data ---- 
 
 load("Data_inputs/BLKI_gls-hourly-behaviour.RData")
+
+# If loading from csv:
+# gls_hourly <- read.csv("Data_inputs/BLKI_gls-hourly-behaviour.csv")
+
 breeding_dates <- read.csv("Data_inputs/BLKI_breeding_dates.csv")
 
 gls_hourly %<>% select(ring, date, hour, activity.mins, colony, col_lat) %>%
@@ -194,7 +198,7 @@ for(i in 1:length(Acto_list)){
 
 # Plot representative birds
 
-#### Figure S6
+#### Figure S5
 
 These birds were selected for the manuscript as they had a substantial dataset with few gaps over the relevant period of time.
 
@@ -301,11 +305,11 @@ multiPlot2 <- cowplot::plot_grid(get(acto_name.df$acto_name.df[13])+ theme(axis.
                         align = c("hv"))
 
 
-png(paste0(actograms.path, "FigureS6_actograms_1.png"), width = 14, height = 9, units = "in", res = 600)
+png(paste0(actograms.path, "FigureS5_actograms_1.png"), width = 14, height = 9, units = "in", res = 600)
 multiPlot1
 dev.off()
 
-png(paste0(actograms.path, "FigureS6_actograms_2.png"), width = 14, height = 9, units = "in", res = 600)
+png(paste0(actograms.path, "FigureS5_actograms_2.png"), width = 14, height = 9, units = "in", res = 600)
 multiPlot2
 dev.off()
 
