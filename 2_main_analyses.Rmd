@@ -417,12 +417,12 @@ n_distinct(DF_lsp$ring)
 
 period_ridges <- ggplot() + 
   geom_density_ridges(data = DF_lsp,
-                      aes(y = as.factor(col_lat), x = Period,
+                      aes(y = sprintf("%.3f", col_lat), x = Period,
                           fill = col_lat), rel_min_height = 0.001, scale = 1.5, alpha = 0.7) +
   geom_point(data = LSP_Results_All, 
-                aes(y = as.factor(col_lat), x = Period_median), colour = "magenta4", shape = 18, size = 3) +
+                aes(y = sprintf("%.3f", col_lat), x = Period_median), colour = "magenta4", shape = 18, size = 3) +
   geom_errorbarh(data = LSP_Results_All, 
-                aes(y = as.factor(col_lat), xmin = Period_median - mad_med, xmax = Period_median + mad_med),
+                aes(y = sprintf("%.3f", col_lat), xmin = Period_median - mad_med, xmax = Period_median + mad_med),
                 colour = "magenta4",
                 height = 0.2,
                 size = 1) +
@@ -430,7 +430,8 @@ period_ridges <- ggplot() +
   labs(y = "Colony latitude (°N)", x = "Period length (hours)", fill = "Lat N",
        tag = "(A)") +
   BLKI_theme +
-  theme(legend.justification = "top")
+  theme(legend.justification = "top",
+        axis.title.y = element_text(margin = margin(r = 15)))
 
 
 med_period <- ggplot() +
@@ -442,7 +443,8 @@ med_period <- ggplot() +
   geom_hline(yintercept = 24, linetype = "dashed", col = "grey50", size  =1) +
   #geom_vline(xintercept = 66.5, linetype = "dotted", col = "grey50", size = 1) +
   scale_y_continuous(breaks = seq(25, 45, by = 5)) +
-  BLKI_theme
+  BLKI_theme +
+  theme(axis.title.y = element_text(margin = margin(r = 10)))
 
 
 png(file = "Figures/Figure2_median_periods.png", width = 21, height = 9, units = "in", res = 600)
